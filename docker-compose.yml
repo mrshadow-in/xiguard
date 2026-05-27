@@ -1,0 +1,128 @@
+name: chrguard
+
+x-backend-env: &backend-env
+  DATABASE_URL: ${DATABASE_URL}
+  DATABASE_SYNC_URL: ${DATABASE_SYNC_URL}
+  REDIS_URL: ${REDIS_URL}
+  CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+  CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND}
+  SECRET_KEY: ${SECRET_KEY}
+  ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+  ADMIN_USERNAME: ${ADMIN_USERNAME}
+  ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+  SESSION_TTL_SEC: ${SESSION_TTL_SEC}
+  DEFAULT_MULTIPLIER: ${DEFAULT_MULTIPLIER}
+  DEFAULT_EVAL_WINDOW_SEC: ${DEFAULT_EVAL_WINDOW_SEC}
+  DEFAULT_BLACKHOLE_DURATION_SEC: ${DEFAULT_BLACKHOLE_DURATION_SEC}
+  DEFAULT_RECOVERY_OBSERVATION_SEC: ${DEFAULT_RECOVERY_OBSERVATION_SEC}
+  BASELINE_EWMA_SPAN: ${BASELINE_EWMA_SPAN}
+  ALERT_DEDUP_WINDOW_SEC: ${ALERT_DEDUP_WINDOW_SEC}
+  POLL_INTERVAL_SEC: ${POLL_INTERVAL_SEC}
+  POLL_TIMEOUT_SEC: ${POLL_TIMEOUT_SEC}
+  TRAFFIC_RETENTION_DAYS: ${TRAFFIC_RETENTION_DAYS}
+  ALERT_RETENTION_DAYS: ${ALERT_RETENTION_DAYS}
+  AUDIT_RETENTION_DAYS: ${AUDIT_RETENTION_DAYS}
+  ORG_NAME: ${ORG_NAME}
+  ORG_AS_NUMBER: ${ORG_AS_NUMBER}
+  ORG_NOC_EMAIL: ${ORG_NOC_EMAIL}
+  ORG_NOC_PHONE: ${ORG_NOC_PHONE}
+  ORG_WEBSITE: ${ORG_WEBSITE}
+  CORS_ORIGINS: ${CORS_ORIGINS}
+  LOG_LEVEL: ${LOG_LEVEL}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build: ./backend
+    environment: *backend-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    restart: unless-stopped
+
+  worker:
+    build: ./backend
+    environment: *backend-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A app.tasks.celery_app.celery_app worker -Q default,critical -c 4 -l info
+    restart: unless-stopped
+
+  worker-email:
+    build: ./backend
+    environment: *backend-env
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: celery -A app.tasks.celery_app.celery_app worker -Q email -c 2 -l info
+    restart: unless-stopped
+
+  beat:
+    build: ./backend
+    environment: *backend-env
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: celery -A app.tasks.celery_app.celery_app beat -l info
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    environment:
+      BACKEND_INTERNAL_URL: http://api:8000
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - frontend
+    restart: unless-stopped
+
+volumes:
+  pg_data:
+  redis_data:
+  caddy_data:
+  caddy_config:

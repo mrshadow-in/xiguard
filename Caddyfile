@@ -1,0 +1,17 @@
+{
+    auto_https off
+}
+
+:80 {
+    encode gzip
+
+    handle /api/ws {
+        reverse_proxy api:8000
+    }
+    handle /api/* {
+        reverse_proxy api:8000
+    }
+    handle {
+        reverse_proxy frontend:3000
+    }
+}
