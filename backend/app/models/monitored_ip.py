@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, String, text
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, String, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import INET, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -27,7 +27,7 @@ class MonitoredIP(UUIDPKMixin, Base):
         ForeignKey("ip_pools.id", ondelete="CASCADE"),
         nullable=False,
     )
-    ip_address: Mapped[str] = mapped_column(INET, nullable=False, unique=True)
+    ip_address: Mapped[str] = mapped_column(INET, nullable=False)
     state: Mapped[str] = mapped_column(String(20), nullable=False, default="NORMAL")
     baseline_bps: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     current_bps: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
@@ -57,4 +57,5 @@ class MonitoredIP(UUIDPKMixin, Base):
             "blackholed_at",
             postgresql_where=text("state = 'BLACKHOLED'"),
         ),
+        UniqueConstraint("pool_id", "ip_address", name="uq_monitored_ips_pool_ip"),
     )

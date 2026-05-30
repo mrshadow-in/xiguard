@@ -67,10 +67,17 @@ async def _cycle() -> dict:
         if not rows:
             return {"ips_evaluated": 0}
 
+        # Drain each unique IP's Redis counter exactly once, then apply the
+        # same sample to every MonitoredIP row sharing that address. This is
+        # what lets two pools (possibly on different CHRs) monitor the same
+        # IP without one starving the other's read.
+        unique_ips = {ip.ip_address for ip in rows}
+        sample_by_ip = {addr: await sample_ip(addr, redis) for addr in unique_ips}
+
         for ip in rows:
             pool: IPPool = ip.pool
             chr_node: CHRNode = pool.chr_node
-            sample = await sample_ip(ip.ip_address, redis)
+            sample = sample_by_ip[ip.ip_address]
             evaluated += 1
             if sample.bps_in > 0 or sample.bps_out > 0:
                 ips_with_data += 1

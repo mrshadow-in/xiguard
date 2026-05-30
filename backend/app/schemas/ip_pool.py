@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 import uuid
 from datetime import datetime
 
@@ -13,6 +14,23 @@ def _to_str_or_none(v):
     return str(v)
 
 
+def _normalize_cidr(v):
+    """Accept anything ipaddress can parse and return the canonical CIDR.
+
+    asyncpg's CIDR encoder requires no host bits set, so we normalize via
+    `strict=False` which masks them off. e.g. '151.243.146.1/24' →
+    '151.243.146.0/24'. Raises ValueError on garbage input.
+    """
+    if v is None:
+        return None
+    s = str(v).strip()
+    try:
+        net = ipaddress.ip_network(s, strict=False)
+    except ValueError as e:
+        raise ValueError(f"invalid CIDR {s!r}: {e}") from None
+    return str(net)
+
+
 class IPPoolBase(BaseModel):
     cidr: str = Field(min_length=9)  # e.g. "1.2.3.0/24"
     description: str | None = None
@@ -24,7 +42,7 @@ class IPPoolBase(BaseModel):
     @field_validator("cidr", mode="before")
     @classmethod
     def _coerce_cidr(cls, v):
-        return _to_str_or_none(v)
+        return _normalize_cidr(v)
 
 
 class IPPoolCreate(IPPoolBase):
@@ -38,6 +56,11 @@ class IPPoolUpdate(BaseModel):
     eval_window_sec: int | None = Field(default=None, ge=5, le=600)
     auto_blackhole: bool | None = None
     blackhole_duration_sec: int | None = Field(default=None, ge=10)
+
+    @field_validator("cidr", mode="before")
+    @classmethod
+    def _coerce_cidr(cls, v):
+        return _normalize_cidr(v)
 
 
 class IPPoolOut(IPPoolBase):
