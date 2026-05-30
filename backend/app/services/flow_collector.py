@@ -114,6 +114,8 @@ async def _flush_loop(
 
 
 async def serve() -> None:
+    import socket as _socket
+
     logging.basicConfig(level=settings.log_level)
     parser = NetFlowParser()
     buffer: dict[str, dict[str, int]] = defaultdict(dict)
@@ -126,6 +128,19 @@ async def serve() -> None:
         lambda: FlowProtocol(parser, buffer, exporter_pkts, meta),
         local_addr=("0.0.0.0", _LISTEN_PORT),
     )
+    # Bump SO_RCVBUF so a sudden flow-record surge (e.g. during an actual
+    # DDoS on a monitored IP) doesn't overflow the kernel UDP queue and
+    # drop packets. The kernel will clamp to net.core.rmem_max if that's
+    # below 16 MiB — operator should `sysctl -w net.core.rmem_max=33554432`
+    # on the host for the bigger buffer to actually stick.
+    try:
+        sock = transport.get_extra_info("socket")
+        if sock is not None:
+            sock.setsockopt(_socket.SOL_SOCKET, _socket.SO_RCVBUF, 16 * 1024 * 1024)
+            actual = sock.getsockopt(_socket.SOL_SOCKET, _socket.SO_RCVBUF)
+            logger.warning("flow-collector SO_RCVBUF=%d (requested 16 MiB)", actual)
+    except Exception:
+        logger.exception("failed to set UDP recv buffer")
     logger.warning("flow-collector listening on UDP %d", _LISTEN_PORT)
 
     flush_task = asyncio.create_task(_flush_loop(redis, buffer, exporter_pkts, meta))

@@ -22,8 +22,6 @@ from sqlalchemy.orm import selectinload
 from app.database import SessionLocal
 from app.services import stats
 from app.models.alert import (
-    ALERT_BLACKHOLE_APPLIED,
-    ALERT_BLACKHOLE_FAILED,
     ALERT_DDOS,
     ALERT_RECOVERED,
     Alert,
@@ -32,13 +30,13 @@ from app.models.chr_node import CHRNode
 from app.models.ip_pool import IPPool
 from app.models.monitored_ip import MonitoredIP
 from app.models.traffic_sample import TrafficSample
-from app.services import alerter
 from app.services.detector import evaluate
-from app.services.mitigator import push_blackhole
 from app.services.poller import sample_ip
-from app.services.pubsub import CH_ALERTS, CH_STATE, CH_TRAFFIC, get_redis, publish
+from app.services.pubsub import CH_STATE, CH_TRAFFIC, get_redis, publish
 from app.tasks._runner import run
+from app.tasks.alert_dispatch import dispatch_ddos_email, dispatch_recovery_email
 from app.tasks.celery_app import celery_app
+from app.tasks.mitigation import push_blackhole_now
 
 logger = logging.getLogger(__name__)
 
@@ -132,12 +130,26 @@ async def _cycle() -> dict:
                     },
                 )
 
-            if decision.should_emit_alert and not await alerter.is_deduplicated(
-                redis, ip.ip_address
-            ):
-                multiplier = (
-                    (sample.bps_in / max(1, ip.baseline_bps)) if ip.baseline_bps else 0
+            # ── Mitigation fast-path ────────────────────────────────────
+            # NEVER block on RouterOS API or SMTP here. The polling cycle
+            # must finish in milliseconds so detection keeps firing for
+            # every other IP during the same attack. Dispatch the side
+            # effects to dedicated workers and trust them to catch up.
+            multiplier = (
+                (sample.bps_in / max(1, ip.baseline_bps)) if ip.baseline_bps else 0
+            )
+
+            if decision.should_apply_blackhole:
+                # Optimistically state-transition; mitigation task will
+                # roll back to ALERT + write a blackhole_failed Alert if
+                # the route doesn't actually land on the CHR.
+                push_blackhole_now.apply_async(
+                    kwargs={"ip_id": str(ip.id), "chr_id": str(chr_node.id)},
+                    queue="critical",
+                    priority=9,
                 )
+
+            if decision.should_emit_alert:
                 alert = Alert(
                     ip_id=ip.id,
                     type=ALERT_DDOS,
@@ -148,54 +160,11 @@ async def _cycle() -> dict:
                 )
                 session.add(alert)
                 await session.flush()
-                await alerter.mark_alerted(redis, ip.ip_address)
-
-                hosting_ok, isp_ok = await alerter.dispatch_ddos_alert(
-                    session,
-                    alert_id=str(alert.id),
-                    ip=ip.ip_address,
-                    pool_cidr=str(pool.cidr),
-                    chr_name=chr_node.name,
-                    chr_host=chr_node.host,
-                    baseline_bps=int(ip.baseline_bps or 0),
-                    peak_bps=int(sample.bps_in),
-                    multiplier=float(multiplier),
-                    configured_multiplier=float(pool.multiplier),
-                    action="Auto-Blackhole Applied" if decision.should_apply_blackhole else "Alert Only",
-                    blackhole_expires_at=None,
-                )
-                alert.hosting_email_sent = hosting_ok
-                alert.isp_email_sent = isp_ok
-                await publish(
-                    CH_ALERTS,
-                    {
-                        "id": str(alert.id),
-                        "ip": ip.ip_address,
-                        "severity": alert.severity,
-                        "type": alert.type,
-                        "baseline_bps": alert.baseline_bps,
-                        "peak_bps": alert.peak_bps,
-                        "multiplier": multiplier,
-                        "action_taken": alert.action_taken,
-                        "timestamp": now.isoformat(),
-                    },
-                )
-
-            if decision.should_apply_blackhole:
-                ok, err = await push_blackhole(ip.ip_address, chr_node)
-                if not ok:
-                    # Verification failed — the route is NOT on the CHR.
-                    # Roll the in-memory state back so we don't lie to the UI
-                    # about it being blackholed when it isn't.
-                    ip.state = "ALERT"
-                    ip.blackholed_at = None
-                session.add(
-                    Alert(
-                        ip_id=ip.id,
-                        type=ALERT_BLACKHOLE_APPLIED if ok else ALERT_BLACKHOLE_FAILED,
-                        severity="info" if ok else "critical",
-                        action_taken="auto_blackhole" if ok else f"blackhole_failed: {err or 'unknown'}"[:30],
-                    )
+                # Email + dedup + WS publish happens in the email-queue
+                # worker so SMTP latency can never block detection.
+                dispatch_ddos_email.apply_async(
+                    kwargs={"alert_id": str(alert.id), "multiplier": float(multiplier)},
+                    queue="email",
                 )
 
             if decision.should_emit_recovery:
@@ -207,13 +176,9 @@ async def _cycle() -> dict:
                         action_taken="recovered",
                     )
                 )
-                await alerter.dispatch_recovery(
-                    session,
-                    ip=ip.ip_address,
-                    pool_cidr=str(pool.cidr),
-                    chr_name=chr_node.name,
-                    baseline_bps=int(ip.baseline_bps or 0),
-                    current_bps=int(sample.bps_in),
+                dispatch_recovery_email.apply_async(
+                    kwargs={"ip_id": str(ip.id)},
+                    queue="email",
                 )
 
         if traffic_rows:

@@ -18,6 +18,48 @@ shell. Estimated time: ~20 minutes.
 | Network | Reachable on TCP 80/443 from your operators; TCP 8728/8729 to each MikroTik CHR; TCP 587/465 outbound to SMTP; **UDP 2055 inbound from each CHR (NetFlow v9)** |
 | DNS | An A/AAAA record pointing to this host (for TLS via Let's Encrypt) |
 
+### 1.0 Xiguard must survive the attack it's trying to mitigate
+
+The single most common operational failure: an actual DDoS hits, the
+upstream Xiguard shares with the target gets saturated, Xiguard's API
+calls to the CHR time out, the polling cycle stalls, and the blackhole
+never lands. Software hardening can't fix a saturated uplink.
+
+Mandatory:
+
+- **Out-of-band network** — Xiguard's host MUST sit on a separate
+  upstream from the IP pools it's protecting, OR on a management VLAN
+  / loopback the attack traffic doesn't traverse. NetFlow export from
+  the CHR to Xiguard's UDP 2055 should ride the same out-of-band link.
+- **Dedicated CPU + RAM** — a `t3.medium` /4 GB VPS shared with
+  unrelated workloads will choke at 1 Gbps+ flow rates. 8 vCPU / 16 GB
+  with no neighbors is the practical baseline.
+- **`sysctl` UDP tuning** — without this the kernel drops NetFlow
+  packets long before the collector sees them:
+
+  ```bash
+  cat >> /etc/sysctl.d/99-xiguard.conf <<EOF
+  net.core.rmem_max = 33554432
+  net.core.rmem_default = 16777216
+  net.core.netdev_max_backlog = 5000
+  EOF
+  sysctl --system
+  ```
+
+The collector requests `SO_RCVBUF = 16 MiB` on startup but the kernel
+clamps to `net.core.rmem_max` if that's smaller. Check the actual
+buffer size in `docker compose logs flow-collector` — the startup line
+prints it.
+
+In the application itself, the polling cycle does the **detection
+only** and dispatches the actual blackhole push to a dedicated Celery
+`critical` queue worker. So even if RouterOS API or SMTP slows down
+under attack load, the polling loop keeps running and other IPs keep
+being evaluated. Verify the critical worker is up: `docker compose ps
+worker` — its command line includes `-Q default,critical`.
+
+---
+
 ### 1.1 Network model — public-IP addressing
 
 In this deployment the Xiguard host and every MikroTik CHR have their

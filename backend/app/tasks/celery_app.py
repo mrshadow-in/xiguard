@@ -15,6 +15,8 @@ celery_app = Celery(
         "app.tasks.recovery",
         "app.tasks.cleanup",
         "app.tasks.health",
+        "app.tasks.mitigation",
+        "app.tasks.alert_dispatch",
     ],
 )
 
@@ -31,6 +33,8 @@ celery_app.conf.update(
         "app.tasks.recovery.*": {"queue": "critical"},
         "app.tasks.cleanup.*": {"queue": "default"},
         "app.tasks.health.*": {"queue": "default"},
+        "app.tasks.mitigation.*": {"queue": "critical"},
+        "app.tasks.alert_dispatch.*": {"queue": "email"},
     },
     beat_schedule={
         "poll-all-chrs": {
