@@ -1,1 +1,1 @@
-"""Celery task definitions for CHRGuard."""
+"""Celery task definitions for Xiguard."""

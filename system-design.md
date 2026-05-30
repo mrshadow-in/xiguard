@@ -1,8 +1,8 @@
-# System Design — CHRGuard: MikroTik CHR DDoS Monitoring Panel
+# System Design — Xiguard: MikroTik CHR DDoS Monitoring Panel
 
 ## 1. Project Overview
 
-**CHRGuard** is an internal NOC-grade web panel that connects to multiple MikroTik CHR (Cloud Hosted Router) instances, monitors per-IP traffic across configured IP pools, detects volumetric DDoS attacks via baseline deviation, triggers automatic RTBH (Remotely Triggered Blackhole) mitigation, and dispatches dual-target email alerts to both the Hosting NOC and the upstream ISP NOC.
+**Xiguard** is an internal NOC-grade web panel that connects to multiple MikroTik CHR (Cloud Hosted Router) instances, monitors per-IP traffic across configured IP pools, detects volumetric DDoS attacks via baseline deviation, triggers automatic RTBH (Remotely Triggered Blackhole) mitigation, and dispatches dual-target email alerts to both the Hosting NOC and the upstream ISP NOC.
 
 ### 1.1 Problem Statement
 
@@ -58,7 +58,7 @@ When a DDoS attack targets a specific IP in a hosting infrastructure:
 
 | Feature | Description |
 |---------|-------------|
-| Hosting NOC Email | Subject: `[CHRGuard ALERT] DDoS detected on {IP}` — includes traffic graph, baseline vs current, CHR name, pool, timestamp |
+| Hosting NOC Email | Subject: `[Xiguard ALERT] DDoS detected on {IP}` — includes traffic graph, baseline vs current, CHR name, pool, timestamp |
 | ISP NOC Email | Subject: `[URGENT] Manual scrubbing requested for {IP}` — formal tone requesting immediate scrubbing, includes IP, AS number, approximate attack volume, contact details |
 | Alert Dedup | No repeat alerts for same IP within 5-minute window |
 | Recovery Email | Notify both NOCs when blackhole is lifted and traffic normalizes |
@@ -291,7 +291,7 @@ async def poll_chr(chr_node: CHRNode) -> dict[str, TrafficSample]:
 ### 9.1 Hosting NOC Alert
 
 ```
-Subject: [CHRGuard ALERT] DDoS detected on {ip_address}
+Subject: [Xiguard ALERT] DDoS detected on {ip_address}
 ---
 ALERT: Volumetric DDoS Attack Detected
 
@@ -308,7 +308,7 @@ Traffic Analysis:
 
 Action Taken:    {action} (Auto-Blackhole / Alert Only)
 
-This is an automated alert from CHRGuard.
+This is an automated alert from Xiguard.
 ```
 
 ### 9.2 ISP NOC Alert

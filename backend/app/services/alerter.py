@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 def _dedup_key(ip: str) -> str:
-    return f"chrguard:alert-dedup:{ip}"
+    return f"xiguard:alert-dedup:{ip}"
 
 
 async def is_deduplicated(redis: Redis, ip: str) -> bool:
@@ -174,7 +174,7 @@ async def dispatch_recovery(
 
 async def send_test_email(cfg: MailConfig) -> tuple[bool, str | None]:
     body = (
-        "This is a CHRGuard test email.\n\n"
+        "This is a Xiguard test email.\n\n"
         "If you can read this, your SMTP configuration is working correctly."
     )
-    return await _send(cfg, "CHRGuard test email", body, prefix_test=True)
+    return await _send(cfg, "Xiguard test email", body, prefix_test=True)

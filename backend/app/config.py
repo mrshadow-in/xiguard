@@ -16,8 +16,8 @@ class Settings(BaseSettings):
     )
 
     # Database
-    database_url: str = Field(default="postgresql+asyncpg://chrguard:chrguard@localhost:5432/chrguard")
-    database_sync_url: str = Field(default="postgresql+psycopg://chrguard:chrguard@localhost:5432/chrguard")
+    database_url: str = Field(default="postgresql+asyncpg://xiguard:xiguard@localhost:5432/xiguard")
+    database_sync_url: str = Field(default="postgresql+psycopg://xiguard:xiguard@localhost:5432/xiguard")
 
     # Redis / Celery
     redis_url: str = Field(default="redis://localhost:6379/0")

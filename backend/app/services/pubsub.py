@@ -8,10 +8,10 @@ from redis.asyncio import Redis
 
 from app.config import settings
 
-CH_TRAFFIC = "chrguard:traffic"
-CH_ALERTS = "chrguard:alerts"
-CH_STATE = "chrguard:state"
-CH_CHR_STATUS = "chrguard:chr_status"
+CH_TRAFFIC = "xiguard:traffic"
+CH_ALERTS = "xiguard:alerts"
+CH_STATE = "xiguard:state"
+CH_CHR_STATUS = "xiguard:chr_status"
 
 
 _redis: Redis | None = None

@@ -19,7 +19,7 @@ export function Sidebar() {
       <div className="flex items-center gap-2 border-b border-bg-border px-5 py-4">
         <div className="h-3 w-3 rotate-45 bg-state-alert" />
         <div>
-          <div className="font-semibold tracking-wide">CHRGuard</div>
+          <div className="font-semibold tracking-wide">Xiguard</div>
           <div className="text-[11px] uppercase tracking-wider text-ink-mute">DDoS Monitor</div>
         </div>
       </div>

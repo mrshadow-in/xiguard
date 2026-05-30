@@ -28,7 +28,7 @@ async def login(payload: LoginRequest, response: Response, db: DB, redis: RedisD
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     token = secrets.token_urlsafe(32)
-    await redis.set(f"chrguard:session:{token}", str(user.id), ex=settings.session_ttl_sec)
+    await redis.set(f"xiguard:session:{token}", str(user.id), ex=settings.session_ttl_sec)
     user.last_login = datetime.now(timezone.utc)
     await db.commit()
 

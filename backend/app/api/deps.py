@@ -12,7 +12,7 @@ from app.database import get_db
 from app.models.user import User
 from app.services.pubsub import get_redis
 
-SESSION_COOKIE = "chrguard_session"
+SESSION_COOKIE = "xiguard_session"
 
 
 def get_redis_dep() -> Redis:
@@ -26,7 +26,7 @@ async def get_current_user(
 ) -> User:
     if not session_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    user_id = await redis.get(f"chrguard:session:{session_token}")
+    user_id = await redis.get(f"xiguard:session:{session_token}")
     if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
     result = await db.execute(select(User).where(User.id == user_id, User.is_active.is_(True)))

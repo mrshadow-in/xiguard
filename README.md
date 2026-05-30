@@ -1,4 +1,4 @@
-# CHRGuard
+# Xiguard
 
 Internal NOC-grade web panel for multi-MikroTik CHR DDoS monitoring with
 EWMA-baselined per-IP spike detection, automatic RTBH (blackhole)
@@ -42,7 +42,7 @@ Open `http://localhost/` and sign in. Steps:
 
 ## Prerequisite — RouterOS accounting
 
-On each MikroTik CHR, enable IP accounting once (CHRGuard reads
+On each MikroTik CHR, enable IP accounting once (Xiguard reads
 snapshots via the API — no web-access required):
 
 ```

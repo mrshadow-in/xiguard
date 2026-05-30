@@ -105,13 +105,13 @@ class CHRClient:
             **{"dst-address": f"{ip}/32", "type": "blackhole", "comment": comment},
         )
 
-    async def route_remove_chrguard(self, ip: str) -> int:
+    async def route_remove_xiguard(self, ip: str) -> int:
         rows = await self.call("/ip/route/print", **{"?dst-address": f"{ip}/32"})
         removed = 0
         for r in rows:
             comment = str(r.get("comment", ""))
             type_ = str(r.get("type", ""))
-            if type_ == "blackhole" and comment.startswith("CHRGuard"):
+            if type_ == "blackhole" and comment.startswith("Xiguard"):
                 await self.call("/ip/route/remove", **{".id": r[".id"]})
                 removed += 1
         return removed

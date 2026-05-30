@@ -1,3 +1,3 @@
-"""CHRGuard backend application package."""
+"""Xiguard backend application package."""
 
 __version__ = "0.1.0"

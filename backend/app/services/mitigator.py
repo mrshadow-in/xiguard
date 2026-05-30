@@ -15,7 +15,7 @@ _BACKOFF_SEC = 2.0
 
 
 async def push_blackhole(ip: str, chr_node: CHRNode) -> bool:
-    comment = f"CHRGuard auto-blackhole {datetime.now(timezone.utc).isoformat()}"
+    comment = f"Xiguard auto-blackhole {datetime.now(timezone.utc).isoformat()}"
     last_err: Exception | None = None
     for attempt in range(1, _MAX_RETRIES + 1):
         try:
@@ -40,7 +40,7 @@ async def remove_blackhole(ip: str, chr_node: CHRNode) -> bool:
     for attempt in range(1, _MAX_RETRIES + 1):
         try:
             async with CHRClient.from_node(chr_node) as api:
-                removed = await api.route_remove_chrguard(ip)
+                removed = await api.route_remove_xiguard(ip)
             logger.info("blackhole removed", extra={"ip": ip, "count": removed})
             return True
         except Exception as e:  # noqa: BLE001

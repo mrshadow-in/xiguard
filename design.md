@@ -1,9 +1,9 @@
-# Design Document — CHRGuard
+# Design Document — Xiguard
 
 ## 1. Project Structure
 
 ```
-chrguard/
+xiguard/
 ├── CLAUDE.md                    # Claude Code project instructions
 ├── docker-compose.yml
 ├── .env.example
@@ -174,7 +174,7 @@ GET    /api/chr-nodes/{id}/status        # Live connection status + uptime
   "name": "Rajpura Edge CHR",
   "host": "10.0.0.1",
   "api_port": 8728,
-  "username": "chrguard",
+  "username": "xiguard",
   "password": "secure_password",
   "use_ssl": false,
   "description": "Primary edge router — Rajpura DC"
@@ -188,7 +188,7 @@ GET    /api/chr-nodes/{id}/status        # Live connection status + uptime
   "name": "Rajpura Edge CHR",
   "host": "10.0.0.1",
   "api_port": 8728,
-  "username": "chrguard",
+  "username": "xiguard",
   "use_ssl": false,
   "status": "online",
   "last_seen_at": "2026-05-24T10:30:00Z",
@@ -368,22 +368,22 @@ Pushes blackhole routes to the target CHR via RouterOS API.
 ```python
 class Mitigator:
     async def blackhole(self, ip: str, chr_node: CHRNode) -> bool:
-        """Push /ip/route add dst-address={ip}/32 type=blackhole comment=CHRGuard"""
+        """Push /ip/route add dst-address={ip}/32 type=blackhole comment=Xiguard"""
         async with routeros_connect(chr_node) as api:
             await api('/ip/route/add', **{
                 'dst-address': f'{ip}/32',
                 'type': 'blackhole',
-                'comment': f'CHRGuard auto-blackhole {datetime.utcnow().isoformat()}'
+                'comment': f'Xiguard auto-blackhole {datetime.utcnow().isoformat()}'
             })
         return True
     
     async def unblackhole(self, ip: str, chr_node: CHRNode) -> bool:
-        """Find and remove the CHRGuard blackhole route"""
+        """Find and remove the Xiguard blackhole route"""
         async with routeros_connect(chr_node) as api:
             routes = await api('/ip/route/print', **{
                 '?dst-address': f'{ip}/32',
                 '?type': 'blackhole',
-                '?comment': 'CHRGuard*'
+                '?comment': 'Xiguard*'
             })
             for route in routes:
                 await api('/ip/route/remove', **{'.id': route['.id']})
@@ -423,9 +423,9 @@ class WSManager:
     Manages WebSocket connections and broadcasts Redis pub/sub messages.
     
     Channels:
-      chrguard:traffic   — per-IP traffic updates (5s interval)
-      chrguard:alerts    — new alert notifications
-      chrguard:state     — IP state transitions
+      xiguard:traffic   — per-IP traffic updates (5s interval)
+      xiguard:alerts    — new alert notifications
+      xiguard:state     — IP state transitions
     """
     
     def __init__(self):
@@ -450,7 +450,7 @@ class WSManager:
 
 ```bash
 # Database
-DATABASE_URL=postgresql+asyncpg://chrguard:password@localhost:5432/chrguard
+DATABASE_URL=postgresql+asyncpg://xiguard:password@localhost:5432/xiguard
 
 # Redis
 REDIS_URL=redis://localhost:6379/0
@@ -532,8 +532,8 @@ SMTP send fails
 
 ### 6.2 Redis
 
-- **Traffic counters**: `HSET chrguard:traffic:{ip} bps_in {value} bps_out {value} pps_in {value}` with 60s TTL
-- **Baseline cache**: `SET chrguard:baseline:{ip} {ewma_value}` — persisted to DB every 5 minutes
+- **Traffic counters**: `HSET xiguard:traffic:{ip} bps_in {value} bps_out {value} pps_in {value}` with 60s TTL
+- **Baseline cache**: `SET xiguard:baseline:{ip} {ewma_value}` — persisted to DB every 5 minutes
 - **Pub/sub**: separate channels for traffic, alerts, state changes to avoid noisy broadcasts
 
 ### 6.3 Polling Optimization

@@ -19,9 +19,9 @@ def human_bps(bps: float) -> str:
 _env.globals["human_bps"] = human_bps
 
 
-HOSTING_SUBJECT = "[CHRGuard ALERT] DDoS detected on {ip}"
+HOSTING_SUBJECT = "[Xiguard ALERT] DDoS detected on {ip}"
 ISP_SUBJECT = "[URGENT] Manual scrubbing requested — {ip} — AS{asn}"
-RECOVERY_SUBJECT = "[CHRGuard] Traffic recovered — {ip}"
+RECOVERY_SUBJECT = "[Xiguard] Traffic recovered — {ip}"
 
 
 HOSTING_BODY = _env.from_string(
@@ -42,7 +42,7 @@ Traffic Analysis:
 Action Taken:    {{ action }}
 {% if blackhole_expires_at %}Blackhole Exp:   {{ blackhole_expires_at }} UTC{% endif %}
 
-This is an automated alert from CHRGuard.
+This is an automated alert from Xiguard.
 {{ org_name }}
 """
 )
@@ -72,7 +72,7 @@ Regards,
 {{ noc_email }}{% if noc_phone %} | {{ noc_phone }}{% endif %}
 AS{{ asn }}{% if website %} | {{ website }}{% endif %}
 
-— Automated alert — CHRGuard DDoS Monitoring
+— Automated alert — Xiguard DDoS Monitoring
 Ref: ALT-{{ alert_id }}
 """
 )
@@ -92,7 +92,7 @@ The following IP has recovered to normal traffic levels:
 The blackhole route (if previously applied) has been removed and the IP
 is back in service.
 
-— Automated alert — CHRGuard
+— Automated alert — Xiguard
 {{ org_name }}
 """
 )

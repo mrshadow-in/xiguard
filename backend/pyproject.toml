@@ -1,7 +1,7 @@
 [project]
-name = "chrguard-backend"
+name = "xiguard-backend"
 version = "0.1.0"
-description = "CHRGuard — MikroTik CHR DDoS monitoring panel (backend)"
+description = "Xiguard — MikroTik CHR DDoS monitoring panel (backend)"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.110.0",

@@ -20,21 +20,21 @@ from app.api import (
 from app.config import settings
 from app.services.bootstrap import bootstrap_admin_user
 
-logger = logging.getLogger("chrguard")
+logger = logging.getLogger("xiguard")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logging.basicConfig(level=settings.log_level)
-    logger.info("CHRGuard API starting")
+    logger.info("Xiguard API starting")
     await bootstrap_admin_user()
     yield
-    logger.info("CHRGuard API shutting down")
+    logger.info("Xiguard API shutting down")
 
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="CHRGuard",
+        title="Xiguard",
         version="0.1.0",
         description="MikroTik CHR DDoS monitoring panel",
         lifespan=lifespan,

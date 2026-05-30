@@ -1,4 +1,4 @@
-# Wireframes — CHRGuard
+# Wireframes — Xiguard
 
 ## Design Language
 
@@ -24,7 +24,7 @@
 │                                                              │
 │                    ┌──────────────────────┐                   │
 │                    │                      │                   │
-│                    │     ◆ CHRGuard       │                   │
+│                    │     ◆ Xiguard       │                   │
 │                    │     MikroTik DDoS    │                   │
 │                    │     Monitoring       │                   │
 │                    │                      │                   │
@@ -54,7 +54,7 @@ This is the primary screen. NOC operators will have this open 24/7.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ ◆ CHRGuard                                              admin ▼  │ 🔔 3    │
+│ ◆ Xiguard                                              admin ▼  │ 🔔 3    │
 ├────────────────┬─────────────────────────────────────────────────────────────┤
 │                │                                                             │
 │  ◉ Dashboard   │  CHR Node Health                                            │
@@ -126,7 +126,7 @@ This is the primary screen. NOC operators will have this open 24/7.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ ◆ CHRGuard                                              admin ▼  │ 🔔 3    │
+│ ◆ Xiguard                                              admin ▼  │ 🔔 3    │
 ├────────────────┬─────────────────────────────────────────────────────────────┤
 │                │                                                             │
 │  □ Dashboard   │  CHR Nodes                                    [+ Add Node] │
@@ -158,7 +158,7 @@ This is the primary screen. NOC operators will have this open 24/7.
 │                │  │                └──────────┘                         │   │
 │                │  │                                                      │   │
 │                │  │  Username      ┌──────────────────────────────────┐  │   │
-│                │  │                │ chrguard                         │  │   │
+│                │  │                │ xiguard                         │  │   │
 │                │  │                └──────────────────────────────────┘  │   │
 │                │  │                                                      │   │
 │                │  │  Password      ┌──────────────────────────────────┐  │   │
@@ -187,7 +187,7 @@ This is the primary screen. NOC operators will have this open 24/7.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ ◆ CHRGuard                                              admin ▼  │ 🔔 3    │
+│ ◆ Xiguard                                              admin ▼  │ 🔔 3    │
 ├────────────────┬─────────────────────────────────────────────────────────────┤
 │                │                                                             │
 │  □ Dashboard   │  IP Pools                                     [+ Add Pool] │
@@ -254,7 +254,7 @@ This is the primary screen. NOC operators will have this open 24/7.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ ◆ CHRGuard                                              admin ▼  │ 🔔 3    │
+│ ◆ Xiguard                                              admin ▼  │ 🔔 3    │
 ├────────────────┬─────────────────────────────────────────────────────────────┤
 │                │                                                             │
 │  □ Dashboard   │  Alerts                                                     │
@@ -317,7 +317,7 @@ This is the primary screen. NOC operators will have this open 24/7.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ ◆ CHRGuard                                              admin ▼  │ 🔔 3    │
+│ ◆ Xiguard                                              admin ▼  │ 🔔 3    │
 ├────────────────┬─────────────────────────────────────────────────────────────┤
 │                │                                                             │
 │  □ Dashboard   │  Settings → Mail Configuration                             │
@@ -339,7 +339,7 @@ This is the primary screen. NOC operators will have this open 24/7.
 │                │  │                └──────┘                              │   │
 │                │  │                                                      │   │
 │                │  │  Username      ┌──────────────────────────────────┐  │   │
-│                │  │                │ chrguard@netpool.in              │  │   │
+│                │  │                │ xiguard@netpool.in              │  │   │
 │                │  │                └──────────────────────────────────┘  │   │
 │                │  │                                                      │   │
 │                │  │  Password      ┌──────────────────────────────────┐  │   │
@@ -347,7 +347,7 @@ This is the primary screen. NOC operators will have this open 24/7.
 │                │  │                └──────────────────────────────────┘  │   │
 │                │  │                                                      │   │
 │                │  │  From Address  ┌──────────────────────────────────┐  │   │
-│                │  │                │ alerts@chrguard.netpool.in       │  │   │
+│                │  │                │ alerts@xiguard.netpool.in       │  │   │
 │                │  │                └──────────────────────────────────┘  │   │
 │                │  │                                                      │   │
 │                │  │  To (one per line)                                    │   │
@@ -365,7 +365,7 @@ This is the primary screen. NOC operators will have this open 24/7.
 │                │  │                                                      │   │
 │                │  │  Email Preview (Hosting NOC template):               │   │
 │                │  │  ┌──────────────────────────────────────────────┐    │   │
-│                │  │  │ Subject: [CHRGuard ALERT] DDoS detected     │    │   │
+│                │  │  │ Subject: [Xiguard ALERT] DDoS detected     │    │   │
 │                │  │  │          on {ip_address}                     │    │   │
 │                │  │  │                                              │    │   │
 │                │  │  │ ALERT: Volumetric DDoS Attack Detected      │    │   │
@@ -389,7 +389,7 @@ This is the primary screen. NOC operators will have this open 24/7.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ ◆ CHRGuard                                              admin ▼  │ 🔔 3    │
+│ ◆ Xiguard                                              admin ▼  │ 🔔 3    │
 ├────────────────┬─────────────────────────────────────────────────────────────┤
 │                │                                                             │
 │  □ Dashboard   │  Settings → General                                         │
@@ -462,9 +462,9 @@ This is the primary screen. NOC operators will have this open 24/7.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│ From: alerts@chrguard.netpool.in                                 │
+│ From: alerts@xiguard.netpool.in                                 │
 │ To: noc@xitenodes.com                                            │
-│ Subject: [CHRGuard ALERT] DDoS detected on 162.141.0.15         │
+│ Subject: [Xiguard ALERT] DDoS detected on 162.141.0.15         │
 ├──────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
@@ -487,7 +487,7 @@ This is the primary screen. NOC operators will have this open 24/7.
 │  Blackhole Exp:   2026-05-24 10:41:15 UTC (10 min)               │
 │                                                                  │
 │  ─────────────────────────────────────                           │
-│  Automated alert from CHRGuard                                   │
+│  Automated alert from Xiguard                                   │
 │  NETPOOL Technologies Pvt. Ltd.                                  │
 │                                                                  │
 └──────────────────────────────────────────────────────────────────┘
@@ -497,7 +497,7 @@ This is the primary screen. NOC operators will have this open 24/7.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│ From: alerts@chrguard.netpool.in                                 │
+│ From: alerts@xiguard.netpool.in                                 │
 │ To: noc@gtel.in                                                  │
 │ Subject: [URGENT] Manual scrubbing requested — 162.141.0.15      │
 │          — AS215228                                               │
@@ -527,7 +527,7 @@ This is the primary screen. NOC operators will have this open 24/7.
 │  AS215228 | https://netpool.in                                   │
 │                                                                  │
 │  ─────────────────────────────────────                           │
-│  Automated alert — CHRGuard DDoS Monitoring                      │
+│  Automated alert — Xiguard DDoS Monitoring                      │
 │  Ref: ALT-a3f2e1d0                                               │
 │                                                                  │
 └──────────────────────────────────────────────────────────────────┘

@@ -1,4 +1,4 @@
-name: chrguard
+name: xiguard
 
 x-backend-env: &backend-env
   DATABASE_URL: ${DATABASE_URL}

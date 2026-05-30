@@ -1,1 +1,1 @@
-"""Business-logic services for CHRGuard."""
+"""Business-logic services for Xiguard."""

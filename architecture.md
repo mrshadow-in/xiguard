@@ -1,4 +1,4 @@
-# Architecture Document — CHRGuard
+# Architecture Document — Xiguard
 
 ## 1. High-Level Architecture
 
@@ -113,7 +113,7 @@
  │     ┌────────────┐ ┌──────────┐ ┌──────────────┐                      │
  │     │ PostgreSQL │ │  Redis   │ │  Redis       │                      │
  │     │ batch      │ │ HSET     │ │ PUB          │                      │
- │     │ INSERT     │ │ traffic  │ │ chrguard:    │                      │
+ │     │ INSERT     │ │ traffic  │ │ xiguard:    │                      │
  │     │ samples    │ │ cache    │ │ traffic      │───► WebSocket ──► UI │
  │     └────────────┘ └──────────┘ └──────────────┘                      │
  │                                                                         │
@@ -174,7 +174,7 @@
  │                                           └───────┬────────┘          │
  │                                                   │                   │
  │                                                   ▼                   │
- │                                       Redis PUB chrguard:alerts       │
+ │                                       Redis PUB xiguard:alerts       │
  │                                              │                        │
  │                                              ▼                        │
  │                                      WebSocket ──► UI Alert Feed      │
@@ -199,7 +199,7 @@
  │                               │                     │                  │
  │                               │ RouterOS API:       │                  │
  │                               │ /ip/route/remove    │                  │
- │                               │ (CHRGuard routes)   │                  │
+ │                               │ (Xiguard routes)   │                  │
  │                               └──────────┬──────────┘                  │
  │                                          │                              │
  │                                          ▼                              │
@@ -462,7 +462,7 @@ CREATE INDEX idx_audit_time ON audit_log(created_at DESC);
 │                    Management VLAN (10.0.0.0/24)              │
 │                                                               │
 │   ┌──────────────┐                                           │
-│   │   CHRGuard   │                                           │
+│   │   Xiguard   │                                           │
 │   │   Server     │                                           │
 │   │  10.0.0.50   │                                           │
 │   └──────┬───────┘                                           │
@@ -490,9 +490,9 @@ CREATE INDEX idx_audit_time ON audit_log(created_at DESC);
 │ FastAPI     │ 8000     │ HTTP      │ Internal only (behind Caddy│
 │ PostgreSQL  │ 5432     │ TCP       │ Internal only              │
 │ Redis       │ 6379     │ TCP       │ Internal only              │
-│ RouterOS    │ 8728     │ TCP       │ CHRGuard → CHR (plaintext) │
-│ RouterOS    │ 8729     │ TCP+TLS   │ CHRGuard → CHR (encrypted) │
-│ SMTP        │ 587      │ TCP+TLS   │ CHRGuard → Postal/SMTP     │
+│ RouterOS    │ 8728     │ TCP       │ Xiguard → CHR (plaintext) │
+│ RouterOS    │ 8729     │ TCP+TLS   │ Xiguard → CHR (encrypted) │
+│ SMTP        │ 587      │ TCP+TLS   │ Xiguard → Postal/SMTP     │
 └─────────────┴──────────┴───────────┴────────────────────────────┘
 ```
 
@@ -623,7 +623,7 @@ Phase 1 (current): Single Docker Compose deployment
 Phase 2: Separate DB to dedicated PostgreSQL instance
 Phase 3: Add TimescaleDB extension for traffic_samples
 Phase 4: sFlow/NetFlow collector replaces API polling (10× more IPs)
-Phase 5: Multiple CHRGuard workers behind load balancer (if needed)
+Phase 5: Multiple Xiguard workers behind load balancer (if needed)
 ```
 
 ---

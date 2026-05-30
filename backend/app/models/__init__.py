@@ -1,4 +1,4 @@
-"""ORM models for CHRGuard."""
+"""ORM models for Xiguard."""
 from app.models.alert import Alert
 from app.models.audit_log import AuditLog
 from app.models.chr_node import CHRNode
