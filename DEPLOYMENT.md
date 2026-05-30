@@ -15,7 +15,7 @@ shell. Estimated time: ~20 minutes.
 | vCPU | 4 (8 for 5,000+ IPs) |
 | RAM | 8 GB (16 GB for 5,000+ IPs) |
 | Disk | 100 GB NVMe (≈ 50 GB used at 5,000 IPs × 30-day retention) |
-| Network | Reachable on TCP 80/443 from your operators; TCP 8728/8729 to each MikroTik CHR; TCP 587/465 outbound to SMTP |
+| Network | Reachable on TCP 80/443 from your operators; TCP 8728/8729 to each MikroTik CHR; TCP 587/465 outbound to SMTP; **UDP 2055 inbound from each CHR (NetFlow v9)** |
 | DNS | An A/AAAA record pointing to this host (for TLS via Let's Encrypt) |
 
 > Xiguard is a **management-plane** application. Run it on a management
@@ -47,7 +47,13 @@ ufw default allow outgoing
 ufw allow 22/tcp        # SSH
 ufw allow 80/tcp        # ACME HTTP-01 challenge
 ufw allow 443/tcp       # HTTPS
+ufw allow 2055/udp      # NetFlow v9 from your CHRs (lock down by source IP in prod)
 ufw enable
+
+# Restrict 2055/udp to only your CHR addresses (recommended)
+# (repeat for each CHR; replace 10.0.0.1)
+# ufw delete allow 2055/udp
+# ufw allow from 10.0.0.1 to any port 2055 proto udp
 
 # Create a non-root deploy user (skip if you already have one)
 adduser --disabled-password --gecos "" xiguard
@@ -238,13 +244,18 @@ you generated in step 5, then immediately change it in the UI.
 
 ## 8. Prepare each MikroTik CHR
 
-On every CHR you'll point Xiguard at, run once:
+On every CHR you'll point Xiguard at, run the following — replace
+`10.0.0.50` with the Xiguard host's IP that the CHR can reach.
 
 ```routeros
-# Enable IP accounting (Xiguard reads /ip/accounting/snapshot)
-/ip accounting set enabled=yes threshold=4096
+# Traffic Flow export → Xiguard's flow-collector
+/ip traffic-flow set enabled=yes interfaces=all
+/ip traffic-flow set cache-entries=64k active-flow-timeout=00:00:05 \
+                    inactive-flow-timeout=00:00:05
+/ip traffic-flow target add dst-address=10.0.0.50 port=2055 version=9
 
-# Create a dedicated API user with least privilege
+# Create a dedicated API user with least privilege for control-plane
+# actions (blackhole push/remove, health check)
 /user group add name=xiguard policy=api,read,write,!ftp,!local,!telnet,!ssh,!winbox,!web,!sniff,!sensitive,!policy,!test,!password,!reboot,!romon,!dude,!tikapp
 /user add name=xiguard group=xiguard password="<long random>"
 
@@ -252,6 +263,19 @@ On every CHR you'll point Xiguard at, run once:
 /ip service set api address=10.0.0.50/32
 # or, for TLS:
 /ip service set api-ssl address=10.0.0.50/32
+```
+
+> **Why the 5-second flow timeouts?** RouterOS only emits a flow when it
+> hits the cache size limit OR one of the timeouts. With the defaults
+> (active 30m / inactive 15s) a steady-state DDoS would take up to 15
+> seconds to surface its first flow record, defeating the 30-second
+> detection target. The 5-second timeouts above align flow emission
+> with Xiguard's polling cadence.
+
+Verify on the CHR:
+```routeros
+/ip traffic-flow print
+/ip traffic-flow target print
 ```
 
 Then in the Xiguard UI: **CHR Nodes → Add Node** → fill in host, port

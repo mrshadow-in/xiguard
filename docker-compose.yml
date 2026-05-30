@@ -90,6 +90,17 @@ services:
     command: celery -A app.tasks.celery_app.celery_app worker -Q email -c 2 -l info
     restart: unless-stopped
 
+  flow-collector:
+    build: ./backend
+    environment: *backend-env
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: python -m app.services.flow_collector
+    ports:
+      - "2055:2055/udp"
+    restart: unless-stopped
+
   beat:
     build: ./backend
     environment: *backend-env

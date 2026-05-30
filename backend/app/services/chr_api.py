@@ -94,11 +94,6 @@ class CHRClient:
         rows = await self.call("/system/resource/print")
         return rows[0] if rows else {}
 
-    async def accounting_snapshot(self) -> list[dict]:
-        # /ip accounting snapshot take; then /ip accounting snapshot print
-        await self.call("/ip/accounting/snapshot/take")
-        return await self.call("/ip/accounting/snapshot/print")
-
     async def route_add_blackhole(self, ip: str, comment: str) -> None:
         await self.call(
             "/ip/route/add",

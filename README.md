@@ -35,19 +35,29 @@ Open `http://localhost/` and sign in. Steps:
    The pool's host IPs are auto-expanded into monitored entries.
 3. **Settings → Mail** → Configure both NOC SMTP endpoints and send a
    test email to each.
-4. The dashboard updates live as the 5-second polling cycle samples
-   `/ip/accounting/snapshot` on every online CHR.
+4. The dashboard updates live as the 5-second polling cycle reads the
+   NetFlow counters that each CHR is exporting to Xiguard.
 
 ---
 
-## Prerequisite — RouterOS accounting
+## Prerequisite — RouterOS Traffic Flow (NetFlow v9)
 
-On each MikroTik CHR, enable IP accounting once (Xiguard reads
-snapshots via the API — no web-access required):
+Xiguard does **not** poll CHRs for per-IP traffic. Each CHR exports
+NetFlow v9 records over UDP to Xiguard's `flow-collector` service. On
+every CHR, run once (replace `10.0.0.50` with the Xiguard host):
 
 ```
-/ip accounting set enabled=yes threshold=4096
+/ip traffic-flow set enabled=yes interfaces=all
+/ip traffic-flow set active-flow-timeout=00:00:05 inactive-flow-timeout=00:00:05
+/ip traffic-flow target add dst-address=10.0.0.50 port=2055 version=9
 ```
+
+The CHR API (8728/8729) is still used by Xiguard for blackhole route
+push/remove and health checks, so the CHR user needs `api,read,write`.
+See `DEPLOYMENT.md §8` for the full least-privilege user recipe.
+
+> Why Traffic Flow instead of `/ip accounting`? `/ip accounting` was
+> removed in RouterOS 7; Traffic Flow is the v7 replacement.
 
 ---
 
@@ -60,15 +70,20 @@ Caddy ── /api/* ─► FastAPI ─► PostgreSQL 16 (partitioned traffic_sam
                   │ WebSocket fanout from Redis pub/sub
                   │
 Celery Beat ──► Celery worker (default + critical queues)
-                  ├ poll_all_chrs           every 5s
+                  ├ poll_all_chrs           every 5s   (per-IP read from Redis)
                   ├ check_blackhole_expiry  every 30s
-                  ├ health_check_chrs       every 60s
+                  ├ health_check_chrs       every 60s  (RouterOS API)
                   ├ ensure_partitions       daily 00:05 UTC
                   └ cleanup_old_data        daily 03:00 UTC
-                  ▲
-                  │ RouterOS API (librouteros)
-                  ▼
-            CHR #1 … CHR #N
+
+flow-collector  ◄── UDP 2055 NetFlow v9 ── CHR #1 … CHR #N
+       │
+       │ HINCRBY per-IP counters
+       ▼
+     Redis (xiguard:flow:<ip>)
+
+      RouterOS API (8728/8729) ── blackhole push/remove + health probe
+                                  CHR #1 … CHR #N
 ```
 
 ## Per-IP state machine

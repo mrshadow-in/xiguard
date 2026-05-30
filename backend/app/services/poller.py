@@ -1,23 +1,31 @@
-"""Traffic polling orchestrator.
+"""Per-IP traffic poller — reads NetFlow counters from Redis.
 
-For each active CHR, takes an /ip/accounting/snapshot and aggregates
-inbound bytes per destination IP. Returns a dict {ip_string: bps_in}
-computed from the delta since the last snapshot was taken (RouterOS
-``/ip accounting`` snapshots are themselves deltas if you call ``take``
-on a regular interval, so we use the snapshot values directly and
-divide by the configured poll interval).
+The polling task previously talked to each CHR for /ip/accounting/snapshot.
+That feature was removed in RouterOS 7, so traffic data is now fed by the
+flow-collector service via Redis hashes keyed `xiguard:flow:<ip>`.
+
+read_and_reset() is implemented as a Lua script so HGETALL + DEL happens
+atomically — no flow-collector writes can be lost or double-counted
+between the read and the clear.
 """
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+
+from redis.asyncio import Redis
 
 from app.config import settings
-from app.models.chr_node import CHRNode
-from app.services.chr_api import CHRClient
+from app.services.flow_collector import flow_key
+from app.services.pubsub import get_redis
 
-logger = logging.getLogger(__name__)
+# KEYS[1] = the hash key.  Returns the prior contents as a flat list, then deletes the key.
+_READ_RESET_LUA = """
+local data = redis.call('HGETALL', KEYS[1])
+if next(data) ~= nil then
+    redis.call('DEL', KEYS[1])
+end
+return data
+"""
 
 
 @dataclass
@@ -28,64 +36,46 @@ class PerIPSample:
     pps_out: int
 
 
-@dataclass
-class CHRPollResult:
-    chr_id: str
-    ok: bool
-    samples: dict[str, PerIPSample]
-    error: str | None = None
-    polled_at: datetime | None = None
+_script_sha: str | None = None
 
 
-def _to_int(v) -> int:
+async def _ensure_script(redis: Redis) -> str:
+    global _script_sha
+    if _script_sha is None:
+        _script_sha = await redis.script_load(_READ_RESET_LUA)
+    return _script_sha
+
+
+async def _read_and_reset(redis: Redis, key: str) -> dict[str, int]:
+    sha = await _ensure_script(redis)
     try:
-        return int(v)
-    except (TypeError, ValueError):
-        return 0
-
-
-def _aggregate(rows: list[dict], interval_sec: int) -> dict[str, PerIPSample]:
-    """Aggregate accounting rows by destination IP and convert to bps/pps."""
-    per_ip: dict[str, dict[str, int]] = {}
-    for row in rows:
-        dst = row.get("dst-address") or row.get("dst")
-        src = row.get("src-address") or row.get("src")
-        if not dst:
+        flat = await redis.evalsha(sha, 1, key)
+    except Exception:
+        flat = await redis.eval(_READ_RESET_LUA, 1, key)
+    out: dict[str, int] = {}
+    for i in range(0, len(flat), 2):
+        try:
+            out[flat[i]] = int(flat[i + 1])
+        except (TypeError, ValueError):
             continue
-        bytes_ = _to_int(row.get("bytes"))
-        packets = _to_int(row.get("packets"))
-        per_ip.setdefault(dst, {"b_in": 0, "p_in": 0, "b_out": 0, "p_out": 0})
-        per_ip[dst]["b_in"] += bytes_
-        per_ip[dst]["p_in"] += packets
-        if src:
-            per_ip.setdefault(src, {"b_in": 0, "p_in": 0, "b_out": 0, "p_out": 0})
-            per_ip[src]["b_out"] += bytes_
-            per_ip[src]["p_out"] += packets
-
-    out: dict[str, PerIPSample] = {}
-    iv = max(1, int(interval_sec))
-    for ip, counters in per_ip.items():
-        out[ip] = PerIPSample(
-            bps_in=(counters["b_in"] * 8) // iv,
-            bps_out=(counters["b_out"] * 8) // iv,
-            pps_in=counters["p_in"] // iv,
-            pps_out=counters["p_out"] // iv,
-        )
     return out
 
 
-async def poll_chr(chr_node: CHRNode) -> CHRPollResult:
-    polled_at = datetime.now(timezone.utc)
-    try:
-        async with CHRClient.from_node(chr_node) as api:
-            rows = await api.accounting_snapshot()
-    except Exception as e:  # noqa: BLE001
-        logger.warning("CHR poll failed: %s — %s", chr_node.name, e)
-        return CHRPollResult(
-            chr_id=str(chr_node.id), ok=False, samples={}, error=str(e), polled_at=polled_at
-        )
-
-    samples = _aggregate(rows, settings.poll_interval_sec)
-    return CHRPollResult(
-        chr_id=str(chr_node.id), ok=True, samples=samples, polled_at=polled_at
+async def sample_ip(ip_address: str, redis: Redis | None = None) -> PerIPSample:
+    r = redis or get_redis()
+    data = await _read_and_reset(r, flow_key(ip_address))
+    iv = max(1, int(settings.poll_interval_sec))
+    return PerIPSample(
+        bps_in=(data.get("bytes_in", 0) * 8) // iv,
+        bps_out=(data.get("bytes_out", 0) * 8) // iv,
+        pps_in=data.get("pkts_in", 0) // iv,
+        pps_out=data.get("pkts_out", 0) // iv,
     )
+
+
+async def sample_many(ips: list[str], redis: Redis | None = None) -> dict[str, PerIPSample]:
+    r = redis or get_redis()
+    out: dict[str, PerIPSample] = {}
+    for ip in ips:
+        out[ip] = await sample_ip(ip, r)
+    return out
