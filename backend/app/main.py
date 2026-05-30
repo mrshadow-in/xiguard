@@ -15,6 +15,7 @@ from app.api import (
     ip_pools,
     mail_config,
     monitoring,
+    polling,
     ws,
 )
 from app.config import settings
@@ -52,6 +53,7 @@ def create_app() -> FastAPI:
     app.include_router(chr_nodes.router, prefix="/api/chr-nodes", tags=["chr-nodes"])
     app.include_router(ip_pools.router, prefix="/api/ip-pools", tags=["ip-pools"])
     app.include_router(monitoring.router, prefix="/api/monitoring", tags=["monitoring"])
+    app.include_router(polling.router, prefix="/api/polling-status", tags=["polling"])
     app.include_router(alerts.router, prefix="/api/alerts", tags=["alerts"])
     app.include_router(actions.router, prefix="/api/actions", tags=["actions"])
     app.include_router(mail_config.router, prefix="/api/settings", tags=["settings"])

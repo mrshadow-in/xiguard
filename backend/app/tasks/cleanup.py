@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import text
 
 from app.config import settings
 from app.database import SessionLocal
+from app.services import stats
 from app.tasks._runner import run
 from app.tasks.celery_app import celery_app
 
@@ -21,6 +23,7 @@ def ensure_partitions() -> dict:
 
 async def _ensure_partitions() -> dict:
     """Create today + next 2 days of partitions, drop ones older than retention."""
+    started = time.perf_counter()
     created = 0
     dropped = 0
     today = datetime.now(timezone.utc).date()
@@ -65,7 +68,10 @@ async def _ensure_partitions() -> dict:
                 dropped += 1
 
         await session.commit()
-    return {"created": created, "dropped": dropped}
+    duration_ms = int((time.perf_counter() - started) * 1000)
+    result = {"created": created, "dropped": dropped}
+    await stats.record_task("ensure_partitions", duration_ms=duration_ms, result=result)
+    return result
 
 
 @celery_app.task(name="app.tasks.cleanup.cleanup_old_data")
@@ -74,6 +80,7 @@ def cleanup_old_data() -> dict:
 
 
 async def _cleanup_old_data() -> dict:
+    started = time.perf_counter()
     async with SessionLocal() as session:
         alert_cutoff = datetime.now(timezone.utc) - timedelta(days=settings.alert_retention_days)
         audit_cutoff = datetime.now(timezone.utc) - timedelta(days=settings.audit_retention_days)
@@ -84,4 +91,7 @@ async def _cleanup_old_data() -> dict:
             text("DELETE FROM audit_log WHERE created_at < :cutoff"), {"cutoff": audit_cutoff}
         )
         await session.commit()
-    return {"alerts_deleted": a.rowcount or 0, "audit_deleted": b.rowcount or 0}
+    duration_ms = int((time.perf_counter() - started) * 1000)
+    result = {"alerts_deleted": a.rowcount or 0, "audit_deleted": b.rowcount or 0}
+    await stats.record_task("cleanup_old_data", duration_ms=duration_ms, result=result)
+    return result

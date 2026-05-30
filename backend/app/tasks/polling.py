@@ -12,6 +12,7 @@ service over UDP NetFlow and aggregated into Redis. The cycle:
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -19,6 +20,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload
 
 from app.database import SessionLocal
+from app.services import stats
 from app.models.alert import (
     ALERT_BLACKHOLE_APPLIED,
     ALERT_BLACKHOLE_FAILED,
@@ -47,9 +49,11 @@ def poll_all_chrs() -> dict:
 
 
 async def _cycle() -> dict:
+    started = time.perf_counter()
     now = datetime.now(timezone.utc)
     redis = get_redis()
     evaluated = 0
+    ips_with_data = 0
     traffic_rows: list[dict] = []
 
     async with SessionLocal() as session:
@@ -68,6 +72,8 @@ async def _cycle() -> dict:
             chr_node: CHRNode = pool.chr_node
             sample = await sample_ip(ip.ip_address, redis)
             evaluated += 1
+            if sample.bps_in > 0 or sample.bps_out > 0:
+                ips_with_data += 1
 
             decision = evaluate(ip, pool, sample.bps_in, now=now)
 
@@ -201,4 +207,8 @@ async def _cycle() -> dict:
             await session.execute(pg_insert(TrafficSample).values(traffic_rows))
 
         await session.commit()
-    return {"ips_evaluated": evaluated}
+
+    duration_ms = int((time.perf_counter() - started) * 1000)
+    result = {"ips_evaluated": evaluated, "ips_with_data": ips_with_data}
+    await stats.record_task("poll_all_chrs", duration_ms=duration_ms, result=result, redis=redis)
+    return result

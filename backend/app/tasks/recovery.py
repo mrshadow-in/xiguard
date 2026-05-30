@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -10,6 +11,7 @@ from app.database import SessionLocal
 from app.models.chr_node import CHRNode
 from app.models.ip_pool import IPPool
 from app.models.monitored_ip import MonitoredIP
+from app.services import stats
 from app.services.mitigator import remove_blackhole
 from app.services.pubsub import CH_STATE, publish
 from app.tasks._runner import run
@@ -24,6 +26,7 @@ def check_blackhole_expiry() -> dict:
 
 
 async def _check() -> dict:
+    started = time.perf_counter()
     now = datetime.now(timezone.utc)
     lifted = 0
     async with SessionLocal() as session:
@@ -64,4 +67,7 @@ async def _check() -> dict:
                 },
             )
         await session.commit()
-    return {"lifted": lifted}
+    duration_ms = int((time.perf_counter() - started) * 1000)
+    result = {"lifted": lifted}
+    await stats.record_task("check_blackhole_expiry", duration_ms=duration_ms, result=result)
+    return result

@@ -1,13 +1,14 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Cpu, Network, Bell, Settings } from "lucide-react";
+import { Activity, Cpu, Network, Bell, Settings, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard", icon: Activity },
   { href: "/chr-nodes", label: "CHR Nodes", icon: Cpu },
   { href: "/ip-pools", label: "IP Pools", icon: Network },
+  { href: "/polling", label: "Polling", icon: Radio },
   { href: "/alerts", label: "Alerts", icon: Bell },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -11,6 +12,7 @@ from app.models.chr_node import CHRNode
 from app.services.chr_api import CHRClient
 from app.services.crypto import decrypt
 from app.services.chr_api import CHRConnectionInfo
+from app.services import stats
 from app.services.pubsub import CH_CHR_STATUS, publish
 from app.tasks._runner import run
 from app.tasks.celery_app import celery_app
@@ -38,6 +40,7 @@ async def _ping(node: CHRNode) -> tuple[CHRNode, bool]:
 
 
 async def _check() -> dict:
+    started = time.perf_counter()
     online = 0
     offline = 0
     async with SessionLocal() as session:
@@ -60,4 +63,7 @@ async def _check() -> dict:
                     {"chr_id": str(node.id), "name": node.name, "status": node.status},
                 )
         await session.commit()
-    return {"online": online, "offline": offline}
+    duration_ms = int((time.perf_counter() - started) * 1000)
+    result = {"online": online, "offline": offline}
+    await stats.record_task("health_check_chrs", duration_ms=duration_ms, result=result)
+    return result
