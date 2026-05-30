@@ -125,10 +125,15 @@ async def test_blackhole(node_id: uuid.UUID, _: CurrentUser, db: DB) -> dict:
 
     try:
         async with CHRClient.from_node(node) as api:
-            # 1. Add
+            # 1. Add (cycles through type=blackhole, blackhole=yes, gateway=blackhole)
             try:
-                returned_id = await api.route_add_blackhole(test_ip, comment)
-                steps.append({"step": "add", "ok": True, "returned_id": returned_id})
+                returned_id, syntax = await api.route_add_blackhole(test_ip, comment)
+                steps.append({
+                    "step": "add",
+                    "ok": True,
+                    "returned_id": returned_id,
+                    "syntax_used": syntax,
+                })
             except Exception as e:  # noqa: BLE001
                 steps.append({"step": "add", "ok": False, "error": repr(e)})
                 return {"ok": False, "test_ip": test_ip, "steps": steps}

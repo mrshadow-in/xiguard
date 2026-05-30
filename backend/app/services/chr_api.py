@@ -94,18 +94,34 @@ class CHRClient:
         rows = await self.call("/system/resource/print")
         return rows[0] if rows else {}
 
-    async def route_add_blackhole(self, ip: str, comment: str) -> str | None:
-        """Add a blackhole route. Returns the API-assigned `.id` if RouterOS
-        gave us one, else None — caller should verify with `route_find_xiguard`."""
-        result = await self.call(
-            "/ip/route/add",
-            **{"dst-address": f"{ip}/32", "type": "blackhole", "comment": comment},
-        )
-        if not result:
-            return None
-        first = result[0] if isinstance(result, list) and result else {}
-        # librouteros surfaces the new id either as `ret` or `.id`.
-        return first.get("ret") or first.get(".id")
+    async def route_add_blackhole(self, ip: str, comment: str) -> tuple[str | None, str]:
+        """Add a blackhole route. Tries the three known RouterOS syntaxes
+        in order until one is accepted:
+
+          1. type=blackhole          (RouterOS 6, and most 7.x docs)
+          2. blackhole=yes           (RouterOS 7.x post routing-rewrite)
+          3. gateway=blackhole       (legacy)
+
+        Returns (new_id_or_none, syntax_used). Raises the last exception
+        if all three were rejected.
+        """
+        base = {"dst-address": f"{ip}/32", "comment": comment}
+        attempts: list[tuple[str, dict[str, str]]] = [
+            ("type=blackhole", {**base, "type": "blackhole"}),
+            ("blackhole=yes", {**base, "blackhole": "yes"}),
+            ("gateway=blackhole", {**base, "gateway": "blackhole"}),
+        ]
+        last_exc: Exception | None = None
+        for label, params in attempts:
+            try:
+                result = await self.call("/ip/route/add", **params)
+                first = (result[0] if isinstance(result, list) and result else {}) or {}
+                return (first.get("ret") or first.get(".id"), label)
+            except Exception as e:  # noqa: BLE001
+                last_exc = e
+                continue
+        assert last_exc is not None
+        raise last_exc
 
     async def route_find_xiguard(self, ip: str) -> list[dict]:
         """Return any /ip/route entries for this /32 that we (Xiguard) created."""

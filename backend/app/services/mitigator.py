@@ -28,17 +28,17 @@ async def push_blackhole(ip: str, chr_node: CHRNode) -> tuple[bool, str | None]:
     for attempt in range(1, _MAX_RETRIES + 1):
         try:
             async with CHRClient.from_node(chr_node) as api:
-                returned_id = await api.route_add_blackhole(ip, comment)
+                returned_id, syntax = await api.route_add_blackhole(ip, comment)
                 existing = await api.route_find_xiguard(ip)
             if existing:
                 logger.info(
-                    "blackhole verified ip=%s chr=%s id=%s",
-                    ip, chr_node.name, returned_id or "?",
+                    "blackhole verified ip=%s chr=%s syntax=%s id=%s",
+                    ip, chr_node.name, syntax, returned_id or "?",
                 )
                 return True, None
             last_err = (
-                f"add returned {returned_id or 'no id'} but /ip/route/print "
-                "shows no matching Xiguard blackhole route after the call"
+                f"add via {syntax} returned {returned_id or 'no id'} but "
+                "/ip/route/print shows no matching Xiguard blackhole route"
             )
             logger.error("blackhole add not visible ip=%s chr=%s: %s", ip, chr_node.name, last_err)
         except Exception as e:  # noqa: BLE001
