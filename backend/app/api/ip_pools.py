@@ -15,7 +15,7 @@ from app.services.pool_sync import sync_pool_ips
 router = APIRouter()
 
 
-async def _stats(db, pool: IPPool) -> tuple[int, int, int]:
+async def _stats(db, pool: IPPool) -> tuple[int, int, int, int]:
     counts = await db.execute(
         select(MonitoredIP.state, func.count(MonitoredIP.id))
         .where(MonitoredIP.pool_id == pool.id)
@@ -24,22 +24,26 @@ async def _stats(db, pool: IPPool) -> tuple[int, int, int]:
     total = 0
     alerting = 0
     blackholed = 0
+    sampling = 0
     for state, n in counts:
         total += n
         if state == "ALERT":
             alerting += n
         elif state == "BLACKHOLED":
             blackholed += n
-    return total, alerting, blackholed
+        elif state == "SAMPLING":
+            sampling += n
+    return total, alerting, blackholed, sampling
 
 
 async def _to_out(db, pool: IPPool) -> IPPoolOut:
-    total, alerting, blackholed = await _stats(db, pool)
+    total, alerting, blackholed, sampling = await _stats(db, pool)
     out = IPPoolOut.model_validate(pool)
     out.cidr = str(pool.cidr)
     out.ip_count = total
     out.alert_count = alerting
     out.blackhole_count = blackholed
+    out.sampling_count = sampling
     return out
 
 
@@ -59,6 +63,9 @@ async def create_pool(payload: IPPoolCreate, _: CurrentUser, db: DB) -> IPPoolOu
         eval_window_sec=payload.eval_window_sec,
         auto_blackhole=payload.auto_blackhole,
         blackhole_duration_sec=payload.blackhole_duration_sec,
+        warmup_samples=payload.warmup_samples,
+        min_baseline_bps=payload.min_baseline_bps,
+        min_spike_bps=payload.min_spike_bps,
     )
     db.add(pool)
     await db.commit()

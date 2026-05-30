@@ -14,9 +14,13 @@ interface Pool {
   eval_window_sec: number;
   auto_blackhole: boolean;
   blackhole_duration_sec: number;
+  warmup_samples: number;
+  min_baseline_bps: number;
+  min_spike_bps: number;
   ip_count: number;
   alert_count: number;
   blackhole_count: number;
+  sampling_count: number;
 }
 
 interface IPRow {
@@ -25,6 +29,7 @@ interface IPRow {
   state: string;
   baseline_bps: number;
   current_bps: number;
+  sample_count: number;
   is_whitelisted: boolean;
   whitelist_note: string | null;
 }
@@ -76,15 +81,50 @@ export default function PoolDetailPage() {
         <div>
           <h1 className="text-lg font-semibold font-mono">{pool.cidr}</h1>
           <div className="text-xs text-ink-mute">
-            multiplier {pool.multiplier}× · eval {pool.eval_window_sec}s · auto-BH{" "}
+            warmup {pool.warmup_samples} samples (~{Math.round(pool.warmup_samples * 5 / 60)}m) · multiplier {pool.multiplier}× ·
+            eval {pool.eval_window_sec}s · min baseline {humanBps(pool.min_baseline_bps)} · min spike{" "}
+            {humanBps(pool.min_spike_bps)} · auto-BH{" "}
             {pool.auto_blackhole ? "on" : "off"} · BH duration {pool.blackhole_duration_sec}s
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        {pool.sampling_count > 0 && (
+          <div className="panel border-state-recover/40 bg-state-recover/5 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-semibold text-state-recover">
+                  Sampling mode — {pool.sampling_count} of {pool.ip_count} IPs still learning baseline
+                </div>
+                <div className="text-xs text-ink-mute mt-1">
+                  Detection and mitigation are disabled for IPs in this state. Each one needs{" "}
+                  {pool.warmup_samples} samples (~{Math.round(pool.warmup_samples * 5 / 60)} min at 5s polling) before going live.
+                </div>
+              </div>
+              <div className="font-mono text-3xl text-state-recover">
+                {Math.round(((pool.ip_count - pool.sampling_count) / Math.max(1, pool.ip_count)) * 100)}%
+              </div>
+            </div>
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded bg-bg-border">
+              <div
+                className="h-full bg-state-recover transition-all"
+                style={{
+                  width: `${((pool.ip_count - pool.sampling_count) / Math.max(1, pool.ip_count)) * 100}%`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-4 gap-3">
           <div className="panel p-4">
             <div className="text-xs uppercase tracking-wider text-ink-mute">Total IPs</div>
             <div className="mt-1 font-mono text-2xl">{pool.ip_count}</div>
+          </div>
+          <div className="panel p-4">
+            <div className="text-xs uppercase tracking-wider text-ink-mute">Mitigation Active</div>
+            <div className="mt-1 font-mono text-2xl text-state-normal">
+              {pool.ip_count - pool.sampling_count}
+            </div>
           </div>
           <div className="panel p-4">
             <div className="text-xs uppercase tracking-wider text-ink-mute">Alerting</div>
@@ -105,6 +145,7 @@ export default function PoolDetailPage() {
             onChange={(e) => setFilter(e.target.value)}
           >
             <option value="">All states</option>
+            <option value="SAMPLING">SAMPLING</option>
             <option value="NORMAL">NORMAL</option>
             <option value="ALERT">ALERT</option>
             <option value="BLACKHOLED">BLACKHOLED</option>
@@ -141,15 +182,29 @@ export default function PoolDetailPage() {
                       </Link>
                     </td>
                     <td className="table-td">
-                      <StatusBadge state={ip.state} />
-                      {ip.is_whitelisted && (
-                        <span
-                          className="ml-1.5 chip border-state-recover/40 text-state-recover"
-                          title={ip.whitelist_note ?? "no-blackhole whitelist"}
-                        >
-                          WL
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        <StatusBadge state={ip.state} />
+                        {ip.state === "SAMPLING" && (
+                          <span
+                            className="font-mono text-[10px] text-ink-mute"
+                            title={`${ip.sample_count} / ${pool.warmup_samples} samples`}
+                          >
+                            {Math.min(
+                              100,
+                              Math.round((ip.sample_count / pool.warmup_samples) * 100),
+                            )}
+                            %
+                          </span>
+                        )}
+                        {ip.is_whitelisted && (
+                          <span
+                            className="chip border-state-recover/40 text-state-recover"
+                            title={ip.whitelist_note ?? "no-blackhole whitelist"}
+                          >
+                            WL
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="table-td font-mono">{humanBps(ip.current_bps)}</td>
                     <td className="table-td font-mono">{humanBps(ip.baseline_bps)}</td>

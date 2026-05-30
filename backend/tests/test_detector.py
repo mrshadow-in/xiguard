@@ -112,6 +112,48 @@ def test_recovering_with_spike_returns_to_alert_and_blackhole():
     assert d.should_emit_alert
 
 
+def test_sampling_never_alerts_and_arms_after_warmup():
+    pool = make_pool(warmup_samples=5, multiplier=3.0, min_baseline_bps=0, min_spike_bps=0)
+    ip = make_ip(state=State.SAMPLING.value, baseline_bps=0, sample_count=0)
+
+    # First 4 samples: huge "spike" relative to nothing — must NOT fire, just learn.
+    for n in range(4):
+        d = evaluate(ip, pool, bps_in=1_000_000_000, now=_t(n * 5))
+        assert d.new_state == "SAMPLING"
+        assert not d.should_emit_alert
+        assert not d.should_apply_blackhole
+        assert not d.armed
+        ip.baseline_bps = int(d.new_baseline_bps)
+        ip.sample_count = d.new_sample_count
+
+    # 5th sample: warmup reached, IP graduates to NORMAL.
+    d = evaluate(ip, pool, bps_in=1_000_000, now=_t(25))
+    assert d.new_state == "NORMAL"
+    assert d.armed
+    assert not d.should_emit_alert
+
+
+def test_min_baseline_floor_suppresses_spike_on_quiet_ip():
+    # Background traffic ~50 kbps, multiplier=3 — without a floor, a 200 kbps
+    # blip would fire. With min_baseline_bps=1Mbps it must NOT.
+    pool = make_pool(multiplier=3.0, eval_window_sec=30, min_baseline_bps=1_000_000, min_spike_bps=0)
+    ip = make_ip(state=State.NORMAL.value, baseline_bps=50_000, sample_count=1000)
+    d = evaluate(ip, pool, bps_in=200_000, now=_t(30))
+    assert d.new_state == "NORMAL"
+    assert not d.should_emit_alert
+    assert d.spike_start is None
+
+
+def test_min_spike_floor_suppresses_small_absolute_volume():
+    # Baseline is fat enough to clear min_baseline, multiplier exceeded, but the
+    # absolute spike (3 Mbps) is below min_spike_bps=10Mbps. Should be ignored.
+    pool = make_pool(multiplier=3.0, eval_window_sec=30, min_baseline_bps=0, min_spike_bps=10_000_000)
+    ip = make_ip(state=State.NORMAL.value, baseline_bps=500_000, sample_count=1000)
+    d = evaluate(ip, pool, bps_in=3_000_000, now=_t(30))  # 6× baseline but only 3 Mbps
+    assert d.new_state == "NORMAL"
+    assert not d.should_emit_alert
+
+
 def test_recovering_normalizes_after_observation_window(monkeypatch):
     # default_recovery_observation_sec defaults to 60.
     from app.services import detector

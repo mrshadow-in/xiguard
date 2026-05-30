@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from app.models.ip_pool import IPPool
 
 
-IP_STATES = ("NORMAL", "ALERT", "BLACKHOLED", "RECOVERING")
+IP_STATES = ("SAMPLING", "NORMAL", "ALERT", "BLACKHOLED", "RECOVERING")
 
 
 class MonitoredIP(UUIDPKMixin, Base):
@@ -28,7 +28,7 @@ class MonitoredIP(UUIDPKMixin, Base):
         nullable=False,
     )
     ip_address: Mapped[str] = mapped_column(INET, nullable=False)
-    state: Mapped[str] = mapped_column(String(20), nullable=False, default="NORMAL")
+    state: Mapped[str] = mapped_column(String(20), nullable=False, default="SAMPLING")
     baseline_bps: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     current_bps: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     current_pps: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)

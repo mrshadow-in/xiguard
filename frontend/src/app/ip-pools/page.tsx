@@ -21,6 +21,7 @@ interface Pool {
   ip_count: number;
   alert_count: number;
   blackhole_count: number;
+  sampling_count: number;
 }
 
 interface FormState {
@@ -31,6 +32,9 @@ interface FormState {
   eval_window_sec: number;
   auto_blackhole: boolean;
   blackhole_duration_sec: number;
+  warmup_samples: number;
+  min_baseline_bps: number;
+  min_spike_bps: number;
 }
 
 const EMPTY: FormState = {
@@ -41,6 +45,9 @@ const EMPTY: FormState = {
   eval_window_sec: 30,
   auto_blackhole: true,
   blackhole_duration_sec: 600,
+  warmup_samples: 120,
+  min_baseline_bps: 1_000_000,
+  min_spike_bps: 10_000_000,
 };
 
 export default function IPPoolsPage() {
@@ -207,6 +214,40 @@ export default function IPPoolsPage() {
                   onChange={(e) =>
                     setForm({ ...form, blackhole_duration_sec: Number(e.target.value) })
                   }
+                />
+              </div>
+              <div>
+                <label className="label">
+                  Warmup samples
+                  <span className="ml-1 text-ink-dim normal-case">
+                    (≈{Math.round((form.warmup_samples * 5) / 60)} min @ 5s)
+                  </span>
+                </label>
+                <input
+                  className="input font-mono"
+                  type="number"
+                  value={form.warmup_samples}
+                  onChange={(e) => setForm({ ...form, warmup_samples: Number(e.target.value) })}
+                />
+              </div>
+              <div>
+                <label className="label">Min baseline (bps)</label>
+                <input
+                  className="input font-mono"
+                  type="number"
+                  value={form.min_baseline_bps}
+                  onChange={(e) =>
+                    setForm({ ...form, min_baseline_bps: Number(e.target.value) })
+                  }
+                />
+              </div>
+              <div>
+                <label className="label">Min spike (bps)</label>
+                <input
+                  className="input font-mono"
+                  type="number"
+                  value={form.min_spike_bps}
+                  onChange={(e) => setForm({ ...form, min_spike_bps: Number(e.target.value) })}
                 />
               </div>
               <div className="flex items-end pb-1.5">

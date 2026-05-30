@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 
 const STYLES: Record<string, string> = {
+  SAMPLING: "text-ink-mute border-bg-border bg-bg-elev",
   NORMAL: "text-state-normal border-state-normal/40 bg-state-normal/10",
   ALERT: "text-state-alert border-state-alert/40 bg-state-alert/10 animate-pulse-alert",
   BLACKHOLED: "text-state-blackhole border-state-blackhole/40 bg-state-blackhole/15",

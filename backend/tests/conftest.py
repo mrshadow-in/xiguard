@@ -29,6 +29,11 @@ def make_pool(**overrides) -> SimpleNamespace:
         eval_window_sec=30,
         auto_blackhole=True,
         blackhole_duration_sec=600,
+        # Disable warmup + floors by default so existing tests behave like the
+        # pre-0004 detector. Tests that exercise warmup / floors set these.
+        warmup_samples=1,
+        min_baseline_bps=0,
+        min_spike_bps=0,
     )
     base.update(overrides)
     return SimpleNamespace(**base)
@@ -48,6 +53,7 @@ def make_ip(**overrides) -> SimpleNamespace:
         last_spike_at=None,
         blackholed_at=None,
         recovering_at=None,
+        is_whitelisted=False,
     )
     base.update(overrides)
     return SimpleNamespace(**base)

@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import CIDR, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -30,6 +30,9 @@ class IPPool(UUIDPKMixin, TimestampMixin, Base):
     eval_window_sec: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
     auto_blackhole: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     blackhole_duration_sec: Mapped[int] = mapped_column(Integer, nullable=False, default=600)
+    warmup_samples: Mapped[int] = mapped_column(Integer, nullable=False, default=120)
+    min_baseline_bps: Mapped[int] = mapped_column(BigInteger, nullable=False, default=1_000_000)
+    min_spike_bps: Mapped[int] = mapped_column(BigInteger, nullable=False, default=10_000_000)
 
     chr_node: Mapped["CHRNode"] = relationship("CHRNode", back_populates="pools")
     ips: Mapped[list["MonitoredIP"]] = relationship(

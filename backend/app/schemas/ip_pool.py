@@ -38,6 +38,9 @@ class IPPoolBase(BaseModel):
     eval_window_sec: int = Field(default=30, ge=5, le=600)
     auto_blackhole: bool = True
     blackhole_duration_sec: int = Field(default=600, ge=10)
+    warmup_samples: int = Field(default=120, ge=12, le=4320)        # 1min .. 6h at 5s poll
+    min_baseline_bps: int = Field(default=1_000_000, ge=0)
+    min_spike_bps: int = Field(default=10_000_000, ge=0)
 
     @field_validator("cidr", mode="before")
     @classmethod
@@ -56,6 +59,9 @@ class IPPoolUpdate(BaseModel):
     eval_window_sec: int | None = Field(default=None, ge=5, le=600)
     auto_blackhole: bool | None = None
     blackhole_duration_sec: int | None = Field(default=None, ge=10)
+    warmup_samples: int | None = Field(default=None, ge=12, le=4320)
+    min_baseline_bps: int | None = Field(default=None, ge=0)
+    min_spike_bps: int | None = Field(default=None, ge=0)
 
     @field_validator("cidr", mode="before")
     @classmethod
@@ -72,6 +78,7 @@ class IPPoolOut(IPPoolBase):
     ip_count: int = 0
     alert_count: int = 0
     blackhole_count: int = 0
+    sampling_count: int = 0
 
 
 class IPSummary(BaseModel):
@@ -83,6 +90,7 @@ class IPSummary(BaseModel):
     baseline_bps: int
     current_bps: int
     current_pps: int
+    sample_count: int = 0
     spike_start: datetime | None = None
     blackholed_at: datetime | None = None
     is_whitelisted: bool = False
