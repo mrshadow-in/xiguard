@@ -77,19 +77,27 @@ class CHRClient:
             self._api = None
 
     async def call(self, path: str, *query: str, **params: Any) -> list[dict]:
-        """Invoke a RouterOS API command.
+        """Invoke a RouterOS API command via librouteros.rawCmd.
 
-        - kwargs become ``=key=value`` write parameters
-        - positional args are forwarded verbatim — use this for query
-          filters like ``"?dst-address=1.2.3.4/32"`` since RouterOS
-          distinguishes filters (``?``) from set params (``=``).
+        librouteros's Api.__call__ only accepts kwargs (encoded as
+        ``=key=value`` write parameters). To send query filters
+        (``?key=value``) you must use ``rawCmd`` with the words passed
+        positionally. We always go through rawCmd so this wrapper can
+        handle both write params and filters uniformly:
+
+        - kwargs become ``=key=value`` words (write params)
+        - positional args are forwarded verbatim — use these for filters
+          like ``"?dst-address=1.2.3.4/32"``
         """
         if self._api is None:
             raise RuntimeError("CHRClient not connected; use within `async with`")
 
+        words: list[str] = list(query)
+        words.extend(f"={k}={v}" for k, v in params.items())
+
         def _run() -> list[dict]:
             assert self._api is not None
-            return list(self._api(path, *query, **params))
+            return list(self._api.rawCmd(path, *words))
 
         return await asyncio.to_thread(_run)
 
