@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { StatusBadge } from "@/components/StatusBadge";
 import { api } from "@/lib/api";
@@ -129,7 +130,14 @@ export default function PoolDetailPage() {
                 const ratio = ip.baseline_bps > 0 ? ip.current_bps / ip.baseline_bps : 0;
                 return (
                   <tr key={ip.id} className="border-b border-bg-border last:border-0">
-                    <td className="table-td font-mono">{ip.ip_address}</td>
+                    <td className="table-td font-mono">
+                      <Link
+                        href={`/ips/${encodeURIComponent(ip.ip_address)}`}
+                        className="text-state-recover hover:underline"
+                      >
+                        {ip.ip_address}
+                      </Link>
+                    </td>
                     <td className="table-td">
                       <StatusBadge state={ip.state} />
                     </td>

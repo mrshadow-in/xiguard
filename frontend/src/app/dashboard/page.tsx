@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { StatusBadge } from "@/components/StatusBadge";
 import { api } from "@/lib/api";
@@ -15,6 +16,22 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+
+interface AggregatePoint {
+  bucket: string;
+  bps_in: number;
+  bps_out: number;
+  pps_in: number;
+  pps_out: number;
+  ip_count: number;
+}
+interface AggregateSeries {
+  hours: number;
+  bucket_seconds: number;
+  points: AggregatePoint[];
+  current_total_bps_in: number;
+  current_total_bps_out: number;
+}
 
 interface CHRNode {
   id: string;
@@ -100,7 +117,11 @@ function IPStatusGrid({ rows }: { rows: IPSummary[] }) {
           const ratio = ip.baseline_bps > 0 ? ip.current_bps / ip.baseline_bps : 0;
           const pct = Math.min(100, ratio * 20);
           return (
-            <div key={ip.id} className="rounded-md border border-bg-border bg-bg-elev p-3">
+            <Link
+              key={ip.id}
+              href={`/ips/${encodeURIComponent(ip.ip_address)}`}
+              className="block rounded-md border border-bg-border bg-bg-elev p-3 transition hover:border-state-recover/50 hover:bg-bg-border"
+            >
               <div className="flex items-center justify-between">
                 <div className="font-mono text-sm">{ip.ip_address}</div>
                 <StatusBadge state={ip.state} />
@@ -122,7 +143,7 @@ function IPStatusGrid({ rows }: { rows: IPSummary[] }) {
                 <span>base {humanBps(ip.baseline_bps)}</span>
                 <span>{ratio > 0 ? `${ratio.toFixed(1)}×` : "—"}</span>
               </div>
-            </div>
+            </Link>
           );
         })}
         {visible.length === 0 && (
@@ -173,41 +194,97 @@ function AlertFeed({ rows }: { rows: AlertRow[] }) {
   );
 }
 
-function AggregateChart({ rows }: { rows: IPSummary[] }) {
-  // Aggregate current bps and baseline bps across visible IPs into a bar of
-  // last 30 sampled points kept in a local rolling buffer.
-  const [series, setSeries] = useState<{ t: number; bps: number; base: number }[]>([]);
+const HOUR_RANGES = [
+  { label: "1h", hours: 1 },
+  { label: "6h", hours: 6 },
+  { label: "24h", hours: 24 },
+  { label: "7d", hours: 24 * 7 },
+];
+
+function AggregateChart() {
+  const [hours, setHours] = useState(1);
+  const [series, setSeries] = useState<AggregateSeries | null>(null);
+
   useEffect(() => {
-    const sum = rows.reduce(
-      (acc, r) => {
-        acc.bps += r.current_bps;
-        acc.base += r.baseline_bps;
-        return acc;
-      },
-      { bps: 0, base: 0 },
-    );
-    setSeries((prev) => [...prev.slice(-29), { t: Date.now(), bps: sum.bps, base: sum.base }]);
-  }, [rows]);
+    let alive = true;
+    const refresh = async () => {
+      try {
+        const s = await api.get<AggregateSeries>(`/monitoring/aggregate?hours=${hours}`);
+        if (alive) setSeries(s);
+      } catch {
+        /* ignore transient errors */
+      }
+    };
+    refresh();
+    const iv = setInterval(refresh, hours <= 1 ? 5000 : 15000);
+    return () => {
+      alive = false;
+      clearInterval(iv);
+    };
+  }, [hours]);
+
+  const chartData = useMemo(
+    () =>
+      (series?.points ?? []).map((p) => ({
+        t: new Date(p.bucket).getTime(),
+        bps_in: p.bps_in,
+        bps_out: p.bps_out,
+        ip_count: p.ip_count,
+      })),
+    [series],
+  );
 
   return (
     <div className="panel p-4">
       <div className="mb-2 flex items-center justify-between">
-        <div className="text-sm font-semibold">Aggregate Inbound Traffic</div>
-        <div className="text-xs text-ink-mute">live · 30 sample window</div>
+        <div>
+          <div className="text-sm font-semibold">Aggregate Traffic — All Monitored IPs</div>
+          <div className="text-xs text-ink-mute">
+            now: <span className="font-mono text-state-recover">↓ {humanBps(series?.current_total_bps_in ?? 0)}</span>
+            {" · "}
+            <span className="font-mono text-state-normal">↑ {humanBps(series?.current_total_bps_out ?? 0)}</span>
+            {" · "}
+            bucket {series?.bucket_seconds ?? 5}s · {chartData.length} pts
+          </div>
+        </div>
+        <div className="flex items-center gap-1 text-xs">
+          {HOUR_RANGES.map((r) => (
+            <button
+              key={r.label}
+              onClick={() => setHours(r.hours)}
+              className={`rounded-md border px-2 py-1 ${
+                hours === r.hours
+                  ? "border-state-recover bg-state-recover/15 text-ink"
+                  : "border-bg-border text-ink-mute hover:bg-bg-elev"
+              }`}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="h-56">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={series}>
+          <AreaChart data={chartData}>
             <defs>
-              <linearGradient id="cur" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id="agg-in" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.5} />
                 <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="agg-out" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#22c55e" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="#22c55e" stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#1f2733" />
             <XAxis
               dataKey="t"
-              tickFormatter={(t) => new Date(t).toLocaleTimeString().slice(0, 5)}
+              tickFormatter={(t) => {
+                const d = new Date(t as number);
+                return hours <= 24
+                  ? d.toLocaleTimeString().slice(0, 5)
+                  : `${d.getMonth() + 1}/${d.getDate()}`;
+              }}
               stroke="#7b8597"
               tick={{ fontSize: 11 }}
             />
@@ -215,27 +292,26 @@ function AggregateChart({ rows }: { rows: IPSummary[] }) {
               tickFormatter={(v) => humanBps(v as number)}
               stroke="#7b8597"
               tick={{ fontSize: 11 }}
-              width={70}
+              width={72}
             />
             <Tooltip
-              labelFormatter={(t) => new Date(t as number).toLocaleTimeString()}
+              labelFormatter={(t) => new Date(t as number).toLocaleString()}
               formatter={(v) => humanBps(v as number)}
               contentStyle={{ backgroundColor: "#11161d", border: "1px solid #1f2733" }}
             />
             <Area
               type="monotone"
-              dataKey="bps"
+              dataKey="bps_in"
               stroke="#3b82f6"
-              fill="url(#cur)"
-              name="Current"
+              fill="url(#agg-in)"
+              name="Inbound"
             />
             <Area
               type="monotone"
-              dataKey="base"
+              dataKey="bps_out"
               stroke="#22c55e"
-              fill="none"
-              name="Baseline"
-              strokeDasharray="4 4"
+              fill="url(#agg-out)"
+              name="Outbound"
             />
           </AreaChart>
         </ResponsiveContainer>
@@ -316,7 +392,7 @@ export default function DashboardPage() {
 
         <CHRHealthBar nodes={nodes} />
 
-        <AggregateChart rows={mergedIps} />
+        <AggregateChart />
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
           <IPStatusGrid rows={mergedIps} />

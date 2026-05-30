@@ -32,4 +32,26 @@ class IPTrafficHistory(BaseModel):
     state: str
     baseline_bps: int
     current_bps: int
+    pool_cidr: str | None = None
+    chr_name: str | None = None
+    chr_id: uuid.UUID | None = None
+    blackholed_at: datetime | None = None
+    last_spike_at: datetime | None = None
     points: list[IPTrafficPoint]
+
+
+class AggregatePoint(BaseModel):
+    bucket: datetime
+    bps_in: int
+    bps_out: int
+    pps_in: int
+    pps_out: int
+    ip_count: int
+
+
+class AggregateSeries(BaseModel):
+    hours: int
+    bucket_seconds: int
+    points: list[AggregatePoint]
+    current_total_bps_in: int
+    current_total_bps_out: int

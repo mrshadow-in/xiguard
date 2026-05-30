@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 
 from app.api.deps import CurrentUser, DB
 from app.models.chr_node import CHRNode
@@ -13,7 +13,13 @@ from app.models.ip_pool import IPPool
 from app.models.monitored_ip import MonitoredIP
 from app.models.traffic_sample import TrafficSample
 from app.schemas.ip_pool import IPSummary
-from app.schemas.monitoring import IPTrafficHistory, IPTrafficPoint, MonitoringOverview
+from app.schemas.monitoring import (
+    AggregatePoint,
+    AggregateSeries,
+    IPTrafficHistory,
+    IPTrafficPoint,
+    MonitoringOverview,
+)
 
 router = APIRouter()
 
@@ -88,14 +94,29 @@ async def ip_history(
     if not ip:
         raise HTTPException(404, "IP not monitored")
 
+    # Adaptive bucketing so a /7d view doesn't return ~120k points.
+    bucket_sec = _bucket_for_hours(hours)
     since = datetime.now(timezone.utc) - timedelta(hours=hours)
+    stmt = text(
+        """
+        SELECT date_bin(make_interval(secs => :bucket), sampled_at,
+                        TIMESTAMPTZ '2000-01-01') AS bucket,
+               MAX(bps_in)::BIGINT  AS bps_in,
+               MAX(bps_out)::BIGINT AS bps_out,
+               MAX(pps_in)::BIGINT  AS pps_in,
+               MAX(pps_out)::BIGINT AS pps_out
+        FROM traffic_samples
+        WHERE ip_id = :ip_id AND sampled_at >= :since
+        GROUP BY bucket
+        ORDER BY bucket ASC
+        """
+    )
     rows = (
-        await db.execute(
-            select(TrafficSample)
-            .where(TrafficSample.ip_id == ip.id, TrafficSample.sampled_at >= since)
-            .order_by(TrafficSample.sampled_at.asc())
-        )
-    ).scalars().all()
+        await db.execute(stmt, {"bucket": bucket_sec, "ip_id": ip.id, "since": since})
+    ).all()
+
+    pool = await db.get(IPPool, ip.pool_id)
+    chr_node = await db.get(CHRNode, pool.chr_node_id) if pool else None
 
     return IPTrafficHistory(
         ip_id=ip.id,
@@ -103,14 +124,93 @@ async def ip_history(
         state=ip.state,
         baseline_bps=ip.baseline_bps,
         current_bps=ip.current_bps,
+        pool_cidr=str(pool.cidr) if pool else None,
+        chr_name=chr_node.name if chr_node else None,
+        chr_id=chr_node.id if chr_node else None,
+        blackholed_at=ip.blackholed_at,
+        last_spike_at=ip.last_spike_at,
         points=[
             IPTrafficPoint(
-                sampled_at=r.sampled_at,
-                bps_in=r.bps_in,
-                bps_out=r.bps_out,
-                pps_in=r.pps_in,
-                pps_out=r.pps_out,
+                sampled_at=r.bucket,
+                bps_in=int(r.bps_in or 0),
+                bps_out=int(r.bps_out or 0),
+                pps_in=int(r.pps_in or 0),
+                pps_out=int(r.pps_out or 0),
             )
             for r in rows
         ],
+    )
+
+
+def _bucket_for_hours(hours: int) -> int:
+    """Sample bucket size in seconds, chosen so the chart stays under ~700 points."""
+    if hours <= 1:
+        return 5          # native polling cadence
+    if hours <= 6:
+        return 30
+    if hours <= 24:
+        return 60
+    if hours <= 24 * 3:
+        return 5 * 60
+    return 15 * 60
+
+
+@router.get("/aggregate", response_model=AggregateSeries)
+async def aggregate_traffic(
+    _: CurrentUser,
+    db: DB,
+    hours: int = Query(default=1, ge=1, le=24 * 7),
+) -> AggregateSeries:
+    """Sum bps/pps across ALL monitored IPs, time-bucketed for a chart."""
+    bucket_sec = _bucket_for_hours(hours)
+    since = datetime.now(timezone.utc) - timedelta(hours=hours)
+    stmt = text(
+        """
+        WITH per_ip_bucket AS (
+            SELECT ip_id,
+                   date_bin(make_interval(secs => :bucket), sampled_at,
+                            TIMESTAMPTZ '2000-01-01') AS bucket,
+                   MAX(bps_in)  AS bps_in,
+                   MAX(bps_out) AS bps_out,
+                   MAX(pps_in)  AS pps_in,
+                   MAX(pps_out) AS pps_out
+            FROM traffic_samples
+            WHERE sampled_at >= :since
+            GROUP BY ip_id, bucket
+        )
+        SELECT bucket,
+               SUM(bps_in)::BIGINT       AS bps_in,
+               SUM(bps_out)::BIGINT      AS bps_out,
+               SUM(pps_in)::BIGINT       AS pps_in,
+               SUM(pps_out)::BIGINT      AS pps_out,
+               COUNT(DISTINCT ip_id)::INT AS ip_count
+        FROM per_ip_bucket
+        GROUP BY bucket
+        ORDER BY bucket ASC
+        """
+    )
+    rows = (await db.execute(stmt, {"bucket": bucket_sec, "since": since})).all()
+
+    cur_in = await db.scalar(select(func.coalesce(func.sum(MonitoredIP.current_bps), 0))) or 0
+    cur_out_row = await db.execute(
+        text("SELECT COALESCE(SUM(bps_out), 0)::BIGINT FROM traffic_samples WHERE sampled_at >= NOW() - INTERVAL '15 seconds'")
+    )
+    cur_out = int(cur_out_row.scalar() or 0)
+
+    return AggregateSeries(
+        hours=hours,
+        bucket_seconds=bucket_sec,
+        points=[
+            AggregatePoint(
+                bucket=r.bucket,
+                bps_in=int(r.bps_in or 0),
+                bps_out=int(r.bps_out or 0),
+                pps_in=int(r.pps_in or 0),
+                pps_out=int(r.pps_out or 0),
+                ip_count=int(r.ip_count or 0),
+            )
+            for r in rows
+        ],
+        current_total_bps_in=int(cur_in),
+        current_total_bps_out=cur_out,
     )
