@@ -124,15 +124,18 @@ class CHRClient:
         raise last_exc
 
     async def route_find_xiguard(self, ip: str) -> list[dict]:
-        """Return any /ip/route entries for this /32 that we (Xiguard) created."""
+        """Return any /ip/route entries for this /32 that we (Xiguard) created.
+
+        Must tolerate every blackhole representation RouterOS uses:
+          - ROS 6 + some 7.x:    `type=blackhole`
+          - ROS 7 post-rewrite:  `blackhole=true|yes` (type may be absent
+            or read as "unicast")
+        The "Xiguard" comment prefix is our namespace — that's the
+        authoritative match. If it carries our comment, it's our route,
+        we own it, and we'll remove it on unblackhole.
+        """
         rows = await self.call("/ip/route/print", **{"?dst-address": f"{ip}/32"})
-        out: list[dict] = []
-        for r in rows:
-            comment = str(r.get("comment", ""))
-            type_ = str(r.get("type", ""))
-            if type_ == "blackhole" and comment.startswith("Xiguard"):
-                out.append(r)
-        return out
+        return [r for r in rows if str(r.get("comment", "")).startswith("Xiguard")]
 
     async def route_remove_xiguard(self, ip: str) -> int:
         removed = 0

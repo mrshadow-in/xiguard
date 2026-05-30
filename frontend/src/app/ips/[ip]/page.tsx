@@ -118,7 +118,19 @@ export default function IPDetailPage() {
 
   async function action(verb: "blackhole" | "unblackhole") {
     if (!confirm(`${verb} ${ip}?`)) return;
-    await api.post(`/actions/${verb}`, { ip });
+    try {
+      const res = await api.post<{ ok: boolean; error: string | null }>(
+        `/actions/${verb}`,
+        { ip },
+      );
+      if (!res.ok) alert(`${verb} failed: ${res.error ?? "unknown error"}`);
+    } catch (e) {
+      alert(`${verb} request failed: ${String(e)}`);
+    }
+    // Refetch so the UI reflects the new state instead of waiting for the
+    // next 5s poll cycle.
+    const fresh = await api.get<History>(`/monitoring/traffic/${ip}?hours=${hours}`);
+    setData(fresh);
   }
 
   async function toggleWhitelist() {
