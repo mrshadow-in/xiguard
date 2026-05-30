@@ -73,6 +73,35 @@ export default function PoolDetailPage() {
     }
   }
 
+  async function forceResample() {
+    if (!pool) return;
+    const ok = confirm(
+      `Force re-sample every IP in ${pool.cidr}?\n\n` +
+        `All baselines, sample counts and spike timers will be cleared. ` +
+        `Detection will be disabled for ~${Math.round((pool.warmup_samples * 5) / 60)} min ` +
+        `(${pool.warmup_samples} samples at the current 5s polling interval) ` +
+        `while each IP relearns its baseline.\n\n` +
+        `IPs currently BLACKHOLED will be skipped — unblackhole them first ` +
+        `if you want them included.`,
+    );
+    if (!ok) return;
+    setSyncing(true);
+    try {
+      const r = await api.post<{ reset: number; skipped_blackholed: number }>(
+        `/ip-pools/${id}/resample`,
+      );
+      alert(
+        `Re-sampling ${r.reset} IPs — they'll all show 0% progress for a moment then count up.` +
+          (r.skipped_blackholed
+            ? `\n\n${r.skipped_blackholed} BLACKHOLED IP(s) were skipped.`
+            : ""),
+      );
+      await refresh();
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   if (!pool) return <AppShell><div className="text-ink-mute">Loading…</div></AppShell>;
 
   return (
@@ -151,9 +180,14 @@ export default function PoolDetailPage() {
             <option value="BLACKHOLED">BLACKHOLED</option>
             <option value="RECOVERING">RECOVERING</option>
           </select>
-          <button className="btn" onClick={resync} disabled={syncing}>
-            {syncing ? "Syncing…" : "Re-sync IPs from CIDR"}
-          </button>
+          <div className="flex gap-2">
+            <button className="btn" onClick={forceResample} disabled={syncing}>
+              {syncing ? "Working…" : "Force re-sample"}
+            </button>
+            <button className="btn" onClick={resync} disabled={syncing}>
+              {syncing ? "Syncing…" : "Re-sync IPs from CIDR"}
+            </button>
+          </div>
         </div>
 
         <div className="panel overflow-hidden">

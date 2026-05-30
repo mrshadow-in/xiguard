@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 
 from app.api.deps import CurrentUser, DB
 from app.models.ip_pool import IPPool
@@ -145,3 +145,48 @@ async def resync_pool(pool_id: uuid.UUID, _: CurrentUser, db: DB) -> dict:
         raise HTTPException(422, str(e))
     await db.commit()
     return {"added": added, "removed": removed}
+
+
+@router.post("/{pool_id}/resample")
+async def force_resample(pool_id: uuid.UUID, _: CurrentUser, db: DB) -> dict:
+    """Force every IP in this pool back to SAMPLING.
+
+    Resets baseline_bps, sample_count, spike_start, recovering_at and
+    last_spike_at so each IP re-runs the warmup window from scratch.
+    BLACKHOLED IPs are skipped — clearing them here would leave the
+    actual blackhole route on the CHR with no Xiguard state tracking
+    it. The operator should unblackhole those first.
+    """
+    pool = await db.get(IPPool, pool_id)
+    if not pool:
+        raise HTTPException(404, "Pool not found")
+
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+
+    result = await db.execute(
+        text(
+            """
+            UPDATE monitored_ips
+               SET state         = 'SAMPLING',
+                   baseline_bps  = 0,
+                   sample_count  = 0,
+                   spike_start   = NULL,
+                   recovering_at = NULL,
+                   last_spike_at = NULL,
+                   updated_at    = :now
+             WHERE pool_id = :pool_id
+               AND state != 'BLACKHOLED'
+            """
+        ),
+        {"pool_id": pool_id, "now": now},
+    )
+    skipped = await db.scalar(
+        text(
+            "SELECT COUNT(*) FROM monitored_ips "
+            "WHERE pool_id = :pool_id AND state = 'BLACKHOLED'"
+        ),
+        {"pool_id": pool_id},
+    )
+    await db.commit()
+    return {"reset": result.rowcount or 0, "skipped_blackholed": int(skipped or 0)}
