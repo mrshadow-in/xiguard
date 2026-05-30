@@ -75,8 +75,13 @@ async def _flush_loop(
         await asyncio.sleep(_FLUSH_INTERVAL_SEC)
 
         # ── flush per-IP traffic counters ────────────────────────────
-        snapshot = buffer
-        if snapshot:
+        # COPY then clear. Aliasing `snapshot = buffer` and then calling
+        # `buffer.clear()` empties BOTH names because they point to the
+        # same dict — and that was exactly the bug that made every
+        # per-IP counter vanish silently while packets/records still
+        # ticked because they use a separate code path.
+        if buffer:
+            snapshot = dict(buffer)
             buffer.clear()
             pipe = redis.pipeline(transaction=False)
             for ip, fields in snapshot.items():

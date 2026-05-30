@@ -26,7 +26,12 @@ export function Sidebar() {
       </div>
       <nav className="flex-1 space-y-1 p-3">
         {NAV.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || pathname.startsWith(href + "/");
+          const active =
+            pathname === href ||
+            pathname.startsWith(href + "/") ||
+            // /ips/<ip> is the per-IP drill-down — keep "IP Pools" lit since
+            // that's where the page is reached from.
+            (href === "/ip-pools" && pathname.startsWith("/ips/"));
           return (
             <Link
               key={href}
