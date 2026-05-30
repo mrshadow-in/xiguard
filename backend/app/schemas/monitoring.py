@@ -37,6 +37,8 @@ class IPTrafficHistory(BaseModel):
     chr_id: uuid.UUID | None = None
     blackholed_at: datetime | None = None
     last_spike_at: datetime | None = None
+    is_whitelisted: bool = False
+    whitelist_note: str | None = None
     points: list[IPTrafficPoint]
 
 

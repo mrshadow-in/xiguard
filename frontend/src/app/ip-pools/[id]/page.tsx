@@ -25,6 +25,8 @@ interface IPRow {
   state: string;
   baseline_bps: number;
   current_bps: number;
+  is_whitelisted: boolean;
+  whitelist_note: string | null;
 }
 
 export default function PoolDetailPage() {
@@ -140,6 +142,14 @@ export default function PoolDetailPage() {
                     </td>
                     <td className="table-td">
                       <StatusBadge state={ip.state} />
+                      {ip.is_whitelisted && (
+                        <span
+                          className="ml-1.5 chip border-state-recover/40 text-state-recover"
+                          title={ip.whitelist_note ?? "no-blackhole whitelist"}
+                        >
+                          WL
+                        </span>
+                      )}
                     </td>
                     <td className="table-td font-mono">{humanBps(ip.current_bps)}</td>
                     <td className="table-td font-mono">{humanBps(ip.baseline_bps)}</td>

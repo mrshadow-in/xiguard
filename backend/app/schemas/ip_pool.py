@@ -85,8 +85,15 @@ class IPSummary(BaseModel):
     current_pps: int
     spike_start: datetime | None = None
     blackholed_at: datetime | None = None
+    is_whitelisted: bool = False
+    whitelist_note: str | None = None
 
     @field_validator("ip_address", mode="before")
     @classmethod
     def _coerce_ip(cls, v):
         return _to_str_or_none(v)
+
+
+class WhitelistUpdate(BaseModel):
+    is_whitelisted: bool
+    note: str | None = None

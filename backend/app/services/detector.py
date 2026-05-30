@@ -99,6 +99,11 @@ def evaluate(
     threshold = reference_baseline * float(pool.multiplier)
     is_spiking = bps_in > threshold and reference_baseline > 0
 
+    # Whitelisted IPs still alert + email but are NEVER blackholed.
+    # The pool-level auto_blackhole switch is ANDed with the per-IP gate so
+    # an operator can keep policy at the pool while exempting noisy nodes.
+    blackhole_allowed = bool(pool.auto_blackhole) and not bool(getattr(ip, "is_whitelisted", False))
+
     # ── NORMAL ──────────────────────────────────────────────────────────
     if state == State.NORMAL.value:
         if is_spiking:
@@ -108,7 +113,7 @@ def evaluate(
                 decision.new_state = State.ALERT.value
                 decision.last_spike_at = now
                 decision.should_emit_alert = True
-                if pool.auto_blackhole:
+                if blackhole_allowed:
                     decision.new_state = State.BLACKHOLED.value
                     decision.blackholed_at = now
                     decision.spike_start = None
@@ -121,7 +126,7 @@ def evaluate(
     if state == State.ALERT.value:
         if is_spiking:
             decision.last_spike_at = now
-            if pool.auto_blackhole:
+            if blackhole_allowed:
                 decision.new_state = State.BLACKHOLED.value
                 decision.blackholed_at = now
                 decision.spike_start = None
@@ -142,7 +147,7 @@ def evaluate(
             decision.last_spike_at = now
             decision.recovering_at = None
             decision.should_emit_alert = True
-            if pool.auto_blackhole:
+            if blackhole_allowed:
                 decision.new_state = State.BLACKHOLED.value
                 decision.blackholed_at = now
                 decision.spike_start = None

@@ -94,21 +94,35 @@ class CHRClient:
         rows = await self.call("/system/resource/print")
         return rows[0] if rows else {}
 
-    async def route_add_blackhole(self, ip: str, comment: str) -> None:
-        await self.call(
+    async def route_add_blackhole(self, ip: str, comment: str) -> str | None:
+        """Add a blackhole route. Returns the API-assigned `.id` if RouterOS
+        gave us one, else None — caller should verify with `route_find_xiguard`."""
+        result = await self.call(
             "/ip/route/add",
             **{"dst-address": f"{ip}/32", "type": "blackhole", "comment": comment},
         )
+        if not result:
+            return None
+        first = result[0] if isinstance(result, list) and result else {}
+        # librouteros surfaces the new id either as `ret` or `.id`.
+        return first.get("ret") or first.get(".id")
 
-    async def route_remove_xiguard(self, ip: str) -> int:
+    async def route_find_xiguard(self, ip: str) -> list[dict]:
+        """Return any /ip/route entries for this /32 that we (Xiguard) created."""
         rows = await self.call("/ip/route/print", **{"?dst-address": f"{ip}/32"})
-        removed = 0
+        out: list[dict] = []
         for r in rows:
             comment = str(r.get("comment", ""))
             type_ = str(r.get("type", ""))
             if type_ == "blackhole" and comment.startswith("Xiguard"):
-                await self.call("/ip/route/remove", **{".id": r[".id"]})
-                removed += 1
+                out.append(r)
+        return out
+
+    async def route_remove_xiguard(self, ip: str) -> int:
+        removed = 0
+        for r in await self.route_find_xiguard(ip):
+            await self.call("/ip/route/remove", **{".id": r[".id"]})
+            removed += 1
         return removed
 
 

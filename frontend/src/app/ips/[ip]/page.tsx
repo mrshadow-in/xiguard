@@ -37,6 +37,8 @@ interface History {
   chr_id: string | null;
   blackholed_at: string | null;
   last_spike_at: string | null;
+  is_whitelisted: boolean;
+  whitelist_note: string | null;
   points: Point[];
 }
 
@@ -119,6 +121,24 @@ export default function IPDetailPage() {
     await api.post(`/actions/${verb}`, { ip });
   }
 
+  async function toggleWhitelist() {
+    if (!data) return;
+    const want = !data.is_whitelisted;
+    const note = want
+      ? prompt(
+          `Add this IP to the no-blackhole whitelist?\nOptional reason (transit / high-density node / etc):`,
+          data.whitelist_note ?? "",
+        )
+      : null;
+    if (want && note === null) return; // cancelled
+    await api.put(`/monitoring/ips/${encodeURIComponent(ip)}/whitelist`, {
+      is_whitelisted: want,
+      note: want ? (note || null) : null,
+    });
+    const fresh = await api.get<History>(`/monitoring/traffic/${ip}?hours=${hours}`);
+    setData(fresh);
+  }
+
   return (
     <AppShell>
       <div className="space-y-5">
@@ -142,17 +162,36 @@ export default function IPDetailPage() {
           </div>
           <div className="flex items-center gap-2">
             <StatusBadge state={state} />
+            {data?.is_whitelisted && (
+              <span className="chip border-state-recover/40 text-state-recover">
+                whitelisted · alert-only
+              </span>
+            )}
+            <button className="btn" onClick={toggleWhitelist}>
+              {data?.is_whitelisted ? "Remove from whitelist" : "Whitelist (no-BH)"}
+            </button>
             {state === "BLACKHOLED" ? (
               <button className="btn" onClick={() => action("unblackhole")}>
                 Unblackhole
               </button>
             ) : (
-              <button className="btn btn-danger" onClick={() => action("blackhole")}>
+              <button
+                className="btn btn-danger"
+                onClick={() => action("blackhole")}
+                disabled={data?.is_whitelisted}
+                title={data?.is_whitelisted ? "Remove from whitelist first" : ""}
+              >
                 Blackhole
               </button>
             )}
           </div>
         </div>
+        {data?.is_whitelisted && data.whitelist_note && (
+          <div className="panel p-3 text-xs text-ink-mute">
+            <span className="text-state-recover">whitelist note:</span>{" "}
+            {data.whitelist_note}
+          </div>
+        )}
 
         {err && <div className="panel p-3 text-sm text-state-blackhole">{err}</div>}
 

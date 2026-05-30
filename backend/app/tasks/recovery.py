@@ -49,9 +49,9 @@ async def _check() -> dict:
             chr_node = await session.get(CHRNode, pool.chr_node_id)
             if not chr_node:
                 continue
-            ok = await remove_blackhole(ip.ip_address, chr_node)
+            ok, err = await remove_blackhole(ip.ip_address, chr_node)
             if not ok:
-                logger.error("failed to lift blackhole for %s", ip.ip_address)
+                logger.error("failed to lift blackhole for %s: %s", ip.ip_address, err)
                 continue
             ip.state = "RECOVERING"
             ip.recovering_at = now

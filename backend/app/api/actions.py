@@ -37,9 +37,9 @@ async def _resolve(db, ip: str) -> tuple[MonitoredIP, IPPool, CHRNode]:
 @router.post("/blackhole", response_model=ActionResult)
 async def manual_blackhole(payload: BlackholeRequest, _: CurrentUser, db: DB) -> ActionResult:
     rec, _pool, chr_node = await _resolve(db, payload.ip)
-    ok = await push_blackhole(payload.ip, chr_node)
+    ok, err = await push_blackhole(payload.ip, chr_node)
     if not ok:
-        return ActionResult(ok=False, ip=payload.ip, state=rec.state, error="blackhole push failed")
+        return ActionResult(ok=False, ip=payload.ip, state=rec.state, error=err or "blackhole push failed")
     rec.state = "BLACKHOLED"
     rec.blackholed_at = datetime.now(timezone.utc)
     rec.spike_start = None
@@ -50,9 +50,9 @@ async def manual_blackhole(payload: BlackholeRequest, _: CurrentUser, db: DB) ->
 @router.post("/unblackhole", response_model=ActionResult)
 async def manual_unblackhole(payload: BlackholeRequest, _: CurrentUser, db: DB) -> ActionResult:
     rec, _pool, chr_node = await _resolve(db, payload.ip)
-    ok = await remove_blackhole(payload.ip, chr_node)
+    ok, err = await remove_blackhole(payload.ip, chr_node)
     if not ok:
-        return ActionResult(ok=False, ip=payload.ip, state=rec.state, error="route remove failed")
+        return ActionResult(ok=False, ip=payload.ip, state=rec.state, error=err or "route remove failed")
     rec.state = "RECOVERING"
     rec.blackholed_at = None
     rec.recovering_at = datetime.now(timezone.utc)

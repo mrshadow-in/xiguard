@@ -105,3 +105,56 @@ async def test_node(node_id: uuid.UUID, _: CurrentUser, db: DB) -> CHRNodeTestRe
     )
     res = await test_connection(info)
     return CHRNodeTestResult(**res)
+
+
+@router.post("/{node_id}/test-blackhole")
+async def test_blackhole(node_id: uuid.UUID, _: CurrentUser, db: DB) -> dict:
+    """Diagnostic: push a blackhole on a TEST-NET-1 address, verify via
+    /ip/route/print, then remove it. Returns step-by-step results so the
+    operator can see exactly where the pipeline breaks."""
+    from app.services.chr_api import CHRClient
+    from datetime import datetime, timezone as _tz
+
+    node = await db.get(CHRNode, node_id)
+    if not node:
+        raise HTTPException(404, "CHR node not found")
+
+    test_ip = "192.0.2.123"  # RFC 5737 TEST-NET-1 — never routable
+    comment = f"Xiguard test-blackhole {datetime.now(_tz.utc).isoformat()}"
+    steps: list[dict] = []
+
+    try:
+        async with CHRClient.from_node(node) as api:
+            # 1. Add
+            try:
+                returned_id = await api.route_add_blackhole(test_ip, comment)
+                steps.append({"step": "add", "ok": True, "returned_id": returned_id})
+            except Exception as e:  # noqa: BLE001
+                steps.append({"step": "add", "ok": False, "error": repr(e)})
+                return {"ok": False, "test_ip": test_ip, "steps": steps}
+
+            # 2. Verify
+            try:
+                found = await api.route_find_xiguard(test_ip)
+                steps.append({
+                    "step": "verify",
+                    "ok": bool(found),
+                    "found_count": len(found),
+                    "first_id": found[0].get(".id") if found else None,
+                })
+            except Exception as e:  # noqa: BLE001
+                steps.append({"step": "verify", "ok": False, "error": repr(e)})
+                return {"ok": False, "test_ip": test_ip, "steps": steps}
+
+            # 3. Cleanup — always try, even if verify failed
+            try:
+                removed = await api.route_remove_xiguard(test_ip)
+                steps.append({"step": "remove", "ok": True, "removed": removed})
+            except Exception as e:  # noqa: BLE001
+                steps.append({"step": "remove", "ok": False, "error": repr(e)})
+    except Exception as e:  # noqa: BLE001
+        steps.append({"step": "connect", "ok": False, "error": repr(e)})
+        return {"ok": False, "test_ip": test_ip, "steps": steps}
+
+    overall = all(s.get("ok") for s in steps)
+    return {"ok": overall, "test_ip": test_ip, "steps": steps}

@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Index, String, UniqueConstraint, text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, String, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import INET, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -37,6 +37,8 @@ class MonitoredIP(UUIDPKMixin, Base):
     last_spike_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     blackholed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     recovering_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_whitelisted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    whitelist_note: Mapped[str | None] = mapped_column(String(255), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=text("NOW()"),

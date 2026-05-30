@@ -182,13 +182,19 @@ async def _cycle() -> dict:
                 )
 
             if decision.should_apply_blackhole:
-                ok = await push_blackhole(ip.ip_address, chr_node)
+                ok, err = await push_blackhole(ip.ip_address, chr_node)
+                if not ok:
+                    # Verification failed — the route is NOT on the CHR.
+                    # Roll the in-memory state back so we don't lie to the UI
+                    # about it being blackholed when it isn't.
+                    ip.state = "ALERT"
+                    ip.blackholed_at = None
                 session.add(
                     Alert(
                         ip_id=ip.id,
                         type=ALERT_BLACKHOLE_APPLIED if ok else ALERT_BLACKHOLE_FAILED,
                         severity="info" if ok else "critical",
-                        action_taken="auto_blackhole" if ok else "blackhole_failed",
+                        action_taken="auto_blackhole" if ok else f"blackhole_failed: {err or 'unknown'}"[:30],
                     )
                 )
 

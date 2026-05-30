@@ -120,6 +120,27 @@ export default function CHRNodesPage() {
     }
   }
 
+  async function testBlackhole(id: string) {
+    setTestResult("Testing blackhole on 192.0.2.123 (TEST-NET-1)…");
+    try {
+      const res = await api.post<{
+        ok: boolean;
+        test_ip: string;
+        steps: Array<{ step: string; ok: boolean; [k: string]: unknown }>;
+      }>(`/chr-nodes/${id}/test-blackhole`);
+      const lines = res.steps.map(
+        (s) => `${s.ok ? "✓" : "✗"} ${s.step}: ${JSON.stringify({ ...s, step: undefined, ok: undefined })}`,
+      );
+      setTestResult(
+        (res.ok ? `Blackhole pipeline OK for ${res.test_ip}` : `BLACKHOLE PIPELINE BROKEN`) +
+          "\n" +
+          lines.join("\n"),
+      );
+    } catch (e) {
+      setTestResult(`Test failed: ${String(e)}`);
+    }
+  }
+
   async function remove(id: string) {
     if (!confirm("Delete this CHR node? All its pools and IPs will be removed.")) return;
     await api.delete(`/chr-nodes/${id}`);
@@ -165,6 +186,13 @@ export default function CHRNodesPage() {
                   <td className="table-td text-right">
                     <button
                       className="btn"
+                      onClick={() => testBlackhole(n.id)}
+                      title="Push, verify, remove a TEST-NET-1 blackhole route on this CHR"
+                    >
+                      Test BH
+                    </button>{" "}
+                    <button
+                      className="btn"
                       onClick={() => testConnection(n.id)}
                       title="Test connection"
                     >
@@ -191,8 +219,9 @@ export default function CHRNodesPage() {
         </div>
 
         {testResult && (
-          <div className="panel p-3 font-mono text-sm">
-            <span className="text-ink-mute">Connection test: </span>
+          <div className="panel p-3 font-mono text-xs whitespace-pre-wrap">
+            <span className="text-ink-mute">test result:</span>
+            {"\n"}
             {testResult}
           </div>
         )}

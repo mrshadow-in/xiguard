@@ -12,7 +12,7 @@ from app.models.chr_node import CHRNode
 from app.models.ip_pool import IPPool
 from app.models.monitored_ip import MonitoredIP
 from app.models.traffic_sample import TrafficSample
-from app.schemas.ip_pool import IPSummary
+from app.schemas.ip_pool import IPSummary, WhitelistUpdate
 from app.schemas.monitoring import (
     AggregatePoint,
     AggregateSeries,
@@ -129,6 +129,8 @@ async def ip_history(
         chr_id=chr_node.id if chr_node else None,
         blackholed_at=ip.blackholed_at,
         last_spike_at=ip.last_spike_at,
+        is_whitelisted=bool(ip.is_whitelisted),
+        whitelist_note=ip.whitelist_note,
         points=[
             IPTrafficPoint(
                 sampled_at=r.bucket,
@@ -214,3 +216,22 @@ async def aggregate_traffic(
         current_total_bps_in=int(cur_in),
         current_total_bps_out=cur_out,
     )
+
+
+@router.put("/ips/{ip_address}/whitelist", response_model=IPSummary)
+async def set_whitelist(
+    ip_address: str, payload: WhitelistUpdate, _: CurrentUser, db: DB
+) -> IPSummary:
+    """Toggle the per-IP whitelist flag. Whitelisted IPs still alert + email
+    on spike but are NEVER blackholed by the detector."""
+    rows = (
+        await db.execute(select(MonitoredIP).where(MonitoredIP.ip_address == ip_address))
+    ).scalars().all()
+    if not rows:
+        raise HTTPException(404, "IP not monitored")
+    # If the IP exists in more than one pool we apply the flag to all of them.
+    for r in rows:
+        r.is_whitelisted = payload.is_whitelisted
+        r.whitelist_note = payload.note
+    await db.commit()
+    return IPSummary.model_validate(rows[0])
