@@ -31,7 +31,10 @@ async def sync_pool_ips(session: AsyncSession, pool: IPPool) -> tuple[int, int]:
     existing_rows = await session.execute(
         select(MonitoredIP.id, MonitoredIP.ip_address).where(MonitoredIP.pool_id == pool.id)
     )
-    existing_map: dict[str, uuid.UUID] = {row.ip_address: row.id for row in existing_rows}
+    # asyncpg decodes INET to ipaddress.IPv4Address — normalize to str so the
+    # set-difference math below behaves and so duplicate inserts don't slip
+    # through to hit the UNIQUE constraint on monitored_ips.ip_address.
+    existing_map: dict[str, uuid.UUID] = {str(row.ip_address): row.id for row in existing_rows}
     existing_set = set(existing_map.keys())
 
     to_add = desired - existing_set

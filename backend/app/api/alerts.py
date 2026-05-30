@@ -21,7 +21,7 @@ async def _augment(db, row: Alert) -> AlertOut:
     ip = await db.get(MonitoredIP, row.ip_id)
     out = AlertOut.model_validate(row)
     if ip:
-        out.ip_address = ip.ip_address
+        out.ip_address = str(ip.ip_address)
         pool = await db.get(IPPool, ip.pool_id)
         if pool:
             out.pool_cidr = str(pool.cidr)

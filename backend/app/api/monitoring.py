@@ -99,7 +99,7 @@ async def ip_history(
 
     return IPTrafficHistory(
         ip_id=ip.id,
-        ip_address=ip.ip_address,
+        ip_address=str(ip.ip_address),
         state=ip.state,
         baseline_bps=ip.baseline_bps,
         current_bps=ip.current_bps,
