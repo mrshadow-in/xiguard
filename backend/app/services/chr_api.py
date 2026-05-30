@@ -76,13 +76,20 @@ class CHRClient:
                 pass
             self._api = None
 
-    async def call(self, path: str, **params: Any) -> list[dict]:
+    async def call(self, path: str, *query: str, **params: Any) -> list[dict]:
+        """Invoke a RouterOS API command.
+
+        - kwargs become ``=key=value`` write parameters
+        - positional args are forwarded verbatim — use this for query
+          filters like ``"?dst-address=1.2.3.4/32"`` since RouterOS
+          distinguishes filters (``?``) from set params (``=``).
+        """
         if self._api is None:
             raise RuntimeError("CHRClient not connected; use within `async with`")
 
         def _run() -> list[dict]:
             assert self._api is not None
-            return list(self._api(path, **params))
+            return list(self._api(path, *query, **params))
 
         return await asyncio.to_thread(_run)
 
@@ -134,7 +141,10 @@ class CHRClient:
         authoritative match. If it carries our comment, it's our route,
         we own it, and we'll remove it on unblackhole.
         """
-        rows = await self.call("/ip/route/print", **{"?dst-address": f"{ip}/32"})
+        # Filter must be a POSITIONAL arg (?key=value), not a kwarg
+        # (kwargs become `=key=value` write params, which RouterOS rejects
+        # as an unknown parameter named "?dst-address" — fun trap).
+        rows = await self.call("/ip/route/print", f"?dst-address={ip}/32")
         return [r for r in rows if str(r.get("comment", "")).startswith("Xiguard")]
 
     async def route_remove_xiguard(self, ip: str) -> int:
