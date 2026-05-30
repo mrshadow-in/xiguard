@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from app.api.deps import CurrentUser, DB
 from app.models.ip_pool import IPPool
 from app.models.monitored_ip import MonitoredIP
-from app.schemas.ip_pool import IPPoolCreate, IPPoolOut, IPPoolUpdate, IPSummary, IPSummary as _Ip
+from app.schemas.ip_pool import IPPoolCreate, IPPoolOut, IPPoolUpdate, IPSummary
 from app.services.pool_sync import sync_pool_ips
 
 router = APIRouter()
@@ -124,7 +124,7 @@ async def list_pool_ips(
         stmt = stmt.where(MonitoredIP.state == state)
     stmt = stmt.offset(offset).limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
-    return [_Ip.model_validate(r) for r in rows]
+    return [IPSummary.model_validate(r) for r in rows]
 
 
 @router.post("/{pool_id}/sync")

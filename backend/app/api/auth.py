@@ -45,8 +45,7 @@ async def login(payload: LoginRequest, response: Response, db: DB, redis: RedisD
 
 
 @router.post("/logout")
-async def logout(response: Response, redis: RedisDep, request_cookie: str = "") -> dict:
-    # We can't easily get the cookie value without Cookie() dep here; rely on client to drop it.
+async def logout(response: Response) -> dict:
     response.delete_cookie(SESSION_COOKIE, path="/")
     return {"ok": True}
 

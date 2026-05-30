@@ -5,7 +5,6 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import func, select
-from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DB
 from app.models.chr_node import CHRNode
