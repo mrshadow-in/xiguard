@@ -8,6 +8,12 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Diagnostic — prove the right config files were copied into the image.
+RUN echo "=== tsconfig.json ===" && cat tsconfig.json && \
+    echo "=== next.config.js ===" && cat next.config.js && \
+    echo "=== src/lib listing ===" && ls -la src/lib && \
+    echo "=== test resolve ===" && \
+    node -e "console.log(require('path').resolve(__dirname,'src','lib','api.ts'))"
 RUN npm run build
 
 FROM node:20-alpine AS runner
