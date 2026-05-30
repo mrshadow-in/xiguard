@@ -18,10 +18,36 @@ shell. Estimated time: ~20 minutes.
 | Network | Reachable on TCP 80/443 from your operators; TCP 8728/8729 to each MikroTik CHR; TCP 587/465 outbound to SMTP; **UDP 2055 inbound from each CHR (NetFlow v9)** |
 | DNS | An A/AAAA record pointing to this host (for TLS via Let's Encrypt) |
 
-> Xiguard is a **management-plane** application. Run it on a management
-> VLAN. Do **not** expose the API/web UI directly to the public internet
-> without an additional auth layer in front (e.g. WireGuard, Tailscale,
-> SSO-protected reverse proxy).
+### 1.1 Network model — public-IP addressing
+
+In this deployment the Xiguard host and every MikroTik CHR have their
+own public IPv4 addresses. Even though they may sit in the same
+datacenter, **all addressing between Xiguard ↔ CHR is by public IP**:
+
+- The CHR sends NetFlow records to **Xiguard's public IP** on UDP 2055.
+- Xiguard reaches each CHR's **public IP** on TCP 8728 (or 8729 for SSL)
+  for the RouterOS API.
+
+Two consequences flow from that, and the rest of this guide assumes
+them:
+
+1. **Lock both sides down by source IP.** UDP 2055 on the Xiguard host
+   and the RouterOS API on each CHR must be restricted to the other
+   side's public IP only — otherwise you're publishing a NetFlow
+   collector and a RouterOS management API to the internet.
+2. **No private/internal IPs anywhere in the config.** All examples
+   below use placeholders — substitute the *public* addresses:
+
+   | Placeholder | What it is |
+   |---|---|
+   | `203.0.113.10` | Xiguard host **public IP** |
+   | `198.51.100.21`, `198.51.100.22` | CHR #1, CHR #2 **public IPs** |
+
+> Xiguard is still a **management-plane** application — the web UI
+> should not be left wide-open. Either keep it behind WireGuard /
+> Tailscale / an SSO reverse proxy, or at minimum restrict TCP 443 to
+> operator source IPs. The Caddy site in §6 terminates TLS for you, but
+> TLS alone is not authentication.
 
 ---
 
@@ -41,19 +67,26 @@ apt -y install ufw fail2ban unattended-upgrades curl git ca-certificates \
 # Automatic security updates
 dpkg-reconfigure -plow unattended-upgrades
 
-# Firewall — open only what we need
+# Firewall — open only what we need. Public-IP deployment, so we
+# whitelist every source explicitly.
 ufw default deny incoming
 ufw default allow outgoing
-ufw allow 22/tcp        # SSH
-ufw allow 80/tcp        # ACME HTTP-01 challenge
-ufw allow 443/tcp       # HTTPS
-ufw allow 2055/udp      # NetFlow v9 from your CHRs (lock down by source IP in prod)
-ufw enable
 
-# Restrict 2055/udp to only your CHR addresses (recommended)
-# (repeat for each CHR; replace 10.0.0.1)
-# ufw delete allow 2055/udp
-# ufw allow from 10.0.0.1 to any port 2055 proto udp
+ufw allow 22/tcp                    # SSH — better: restrict to your jumphost IP
+ufw allow 80/tcp                    # ACME HTTP-01 challenge (Caddy needs it on first run)
+ufw allow 443/tcp                   # HTTPS web UI — see note below
+
+# NetFlow v9 from each CHR's public IP. Repeat for every CHR you'll add.
+ufw allow from 198.51.100.21 to any port 2055 proto udp comment 'CHR #1 netflow'
+ufw allow from 198.51.100.22 to any port 2055 proto udp comment 'CHR #2 netflow'
+
+# (Recommended) Restrict the web UI to your operator subnets too —
+# pick whichever fits your environment:
+# ufw allow from 203.0.113.0/24 to any port 443 proto tcp comment 'NOC office'
+# (then remove the broad `ufw allow 443/tcp` above)
+
+ufw enable
+ufw status verbose
 
 # Create a non-root deploy user (skip if you already have one)
 adduser --disabled-password --gecos "" xiguard
@@ -244,25 +277,45 @@ you generated in step 5, then immediately change it in the UI.
 
 ## 8. Prepare each MikroTik CHR
 
-On every CHR you'll point Xiguard at, run the following — replace
-`10.0.0.50` with the Xiguard host's IP that the CHR can reach.
+On every CHR you'll point Xiguard at, run the snippet below. **All
+addressing is by public IP** — see §1.1. Substitute:
+
+- `203.0.113.10` → Xiguard host **public IP**
+- `Stark321!` → a long random password for the `xiguard` API user
 
 ```routeros
-# Traffic Flow export → Xiguard's flow-collector
+# ── 1. Traffic Flow export → Xiguard's flow-collector (public IP) ─────
 /ip traffic-flow set enabled=yes interfaces=all
-/ip traffic-flow set cache-entries=64k active-flow-timeout=00:00:05 \
+/ip traffic-flow set cache-entries=64k \
+                    active-flow-timeout=00:00:05 \
                     inactive-flow-timeout=00:00:05
-/ip traffic-flow target add dst-address=10.0.0.50 port=2055 version=9
+/ip traffic-flow target add dst-address=203.0.113.10 port=2055 version=9
 
-# Create a dedicated API user with least privilege for control-plane
-# actions (blackhole push/remove, health check)
-/user group add name=xiguard policy=api,read,write,!ftp,!local,!telnet,!ssh,!winbox,!web,!sniff,!sensitive,!policy,!test,!password,!reboot,!romon,!dude,!tikapp
-/user add name=xiguard group=xiguard password="<long random>"
+# ── 2. Dedicated least-privilege API user for the control plane ──────
+# (used by Xiguard for blackhole push/remove and health checks)
+/user group add name=xiguard \
+    policy=api,read,write,!ftp,!local,!telnet,!ssh,!winbox,!web,!sniff,!sensitive,!policy,!test,!password,!reboot,!romon,!dude,!tikapp
+/user add name=xiguard group=xiguard password="Stark321!"
 
-# (Optional, recommended) restrict the API to the Xiguard host only
-/ip service set api address=10.0.0.50/32
-# or, for TLS:
-/ip service set api-ssl address=10.0.0.50/32
+# ── 3. Lock the RouterOS API down to Xiguard's public IP only ────────
+# Without this the API listens on every interface — never leave it open.
+/ip service set api address=203.0.113.10/32
+# If you'll use SSL (port 8729) instead:
+/ip service set api-ssl address=203.0.113.10/32
+# Optionally disable whichever you're NOT using:
+# /ip service disable api      # if going SSL-only
+# /ip service disable api-ssl  # if going plain-only
+
+# ── 4. (Recommended) firewall the API source at the input chain too ──
+# Belt + braces in case /ip service ACLs are ever loosened. We place
+# both rules at the TOP so they evaluate before any existing
+# default-accept (or default-drop) rules you already have.
+/ip firewall filter add chain=input action=accept protocol=tcp \
+    dst-port=8728,8729 src-address=203.0.113.10 \
+    place-before=0 comment="Xiguard RouterOS API"
+/ip firewall filter add chain=input action=drop protocol=tcp \
+    dst-port=8728,8729 \
+    place-before=1 comment="Drop other RouterOS API attempts"
 ```
 
 > **Why the 5-second flow timeouts?** RouterOS only emits a flow when it
@@ -276,11 +329,32 @@ Verify on the CHR:
 ```routeros
 /ip traffic-flow print
 /ip traffic-flow target print
+/ip service print where name~"api"
+/ip firewall filter print where comment~"Xiguard"
 ```
 
-Then in the Xiguard UI: **CHR Nodes → Add Node** → fill in host, port
-(8728 plain or 8729 with **Use SSL** ticked), username, password →
-**Test Connection** should report RouterOS version + uptime.
+You should see `traffic-flow` enabled with a target at `203.0.113.10:2055`,
+the `api`/`api-ssl` service's `address=203.0.113.10/32`, and your two
+filter rules at the top of the input chain.
+
+Then in the Xiguard UI: **CHR Nodes → Add Node** → fill in:
+
+| Field | Value |
+|---|---|
+| Host | the CHR's **public IP** (e.g. `198.51.100.21`) |
+| API Port | `8728` (plain) or `8729` with **Use SSL** ticked |
+| Username | `xiguard` |
+| Password | the one from step 2 above |
+
+→ **Test Connection** should report RouterOS version + uptime within a
+second. If it times out, double-check that:
+
+1. UDP/TCP egress from Xiguard's host isn't itself firewalled (cloud
+   security groups often deny by default).
+2. The CHR's `/ip service` address ACL has the *exact* Xiguard public
+   IP — not a netblock, unless you spelled out the mask.
+3. The CHR's input filter rules above were placed at the TOP (use
+   `print` to check ordering; reorder with `move`).
 
 ---
 
@@ -421,7 +495,8 @@ Uptime Kuma / Healthchecks.io / your existing monitor at:
 | Symptom | Cause / fix |
 |---|---|
 | `api` exits with `RuntimeError: ENCRYPTION_KEY env var is not set` | You skipped step 5; populate `.env` and `docker compose up -d` again |
-| `Test Connection` on a CHR returns timeout but ping works | RouterOS API service not enabled, or address-list on `/ip service` excludes the Xiguard host — see step 8 |
+| `Test Connection` on a CHR returns timeout but ping works | `/ip service` `address=` ACL doesn't include Xiguard's **public** IP, or step 8.4 firewall rule was placed below an existing default-drop. Re-run `print` on both. |
+| Dashboard says CHR `online` but no traffic samples | Almost always NetFlow not reaching Xiguard. On the CHR: `/ip traffic-flow target print` shows status. On Xiguard: `docker compose logs flow-collector` should mention "listening on UDP 2055"; `docker compose exec redis redis-cli --scan --pattern 'xiguard:flow:*' \| head` should return keys within ~10s. If no keys, check the host firewall (`ufw status`) lists the CHR's public IP for 2055/udp. |
 | Test emails arrive but real alerts don't | The IP must be in a pool, the pool's CHR must be `online`, and traffic must exceed `baseline × multiplier` for `eval_window_sec`. Until `sample_count ≥ baseline_ewma_span` (~1 hour at 5 s) the warm-up is conservative |
 | Dashboard shows `Reconnecting` | Caddy needs the `/api/ws` matcher (see step 6). Confirm with `curl -i https://xiguard.example.com/api/health` — should be `200` |
 | `worker` log spam: `MaxRetriesExceededError` on blackhole push | Check the CHR's API user has `write` policy, and that the route doesn't already exist with a different comment |
