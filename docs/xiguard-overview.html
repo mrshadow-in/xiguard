@@ -1,0 +1,985 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Xiguard — Technical Overview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=block" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0F1B2B;
+    --ink-2: #22344D;
+    --muted: #5A6577;
+    --rule: #D9DEE6;
+    --soft: #F3F5F8;
+    --accent: #E5452B;
+    --amber: #C98210;
+    --green: #23895C;
+    --blue: #2C66D0;
+    --gray: #7E899B;
+  }
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+    font-size: 9.6pt;
+    line-height: 1.52;
+    color: var(--ink);
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    background: #fff;
+  }
+  .mono { font-family: "IBM Plex Mono", Consolas, monospace; }
+
+  .page {
+    width: 210mm;
+    height: 297mm;
+    position: relative;
+    overflow: hidden;
+    padding: 24mm 18mm 20mm;
+    break-after: page;
+  }
+  .page:last-child { break-after: auto; }
+
+  .run-head, .run-foot {
+    position: absolute;
+    left: 18mm; right: 18mm;
+    display: flex;
+    justify-content: space-between;
+    font: 500 7pt/1 "IBM Plex Mono", monospace;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .run-head { top: 10mm; padding-bottom: 2.6mm; border-bottom: .6pt solid var(--rule); }
+  .run-head b { color: var(--ink); font-weight: 600; }
+  .run-foot { bottom: 9mm; padding-top: 2.6mm; border-top: .6pt solid var(--rule); text-transform: none; letter-spacing: .02em; }
+  .run-foot .pg { color: var(--ink); font-weight: 600; letter-spacing: .08em; }
+
+  /* section titles */
+  .sec { display: flex; align-items: baseline; gap: 4mm; margin: 0 0 3mm; }
+  .sec .num { font: 600 10pt/1 "IBM Plex Mono", monospace; color: var(--accent); letter-spacing: .04em; }
+  h2 { font-size: 21pt; line-height: 1.12; margin: 0; font-weight: 600; letter-spacing: -.01em; }
+  h3 { font-size: 11pt; margin: 5.5mm 0 1.6mm; font-weight: 600; }
+  .lede { font-size: 11.2pt; line-height: 1.5; color: var(--ink-2); margin: 0 0 5mm; max-width: 158mm; }
+  p { margin: 0 0 2.6mm; }
+  .muted { color: var(--muted); }
+  .small { font-size: 8.4pt; line-height: 1.45; }
+  strong { font-weight: 600; }
+  code, .code { font-family: "IBM Plex Mono", Consolas, monospace; font-size: .9em; }
+  code { background: var(--soft); padding: .2mm 1mm; border-radius: 1mm; }
+
+  figure { margin: 4mm 0 4mm; }
+  figure svg { width: 100%; height: auto; display: block; }
+  figcaption { font-size: 8pt; color: var(--muted); margin-top: 2mm; }
+  figcaption b { color: var(--ink); font-weight: 600; }
+
+  ul.clean { list-style: none; padding: 0; margin: 0; }
+  ul.dash { padding-left: 4.2mm; margin: 0 0 2.6mm; }
+  ul.dash li { margin: 0 0 1.4mm; }
+  ul.dash li::marker { content: "—  "; color: var(--accent); }
+
+  .callout {
+    border-left: 2.2pt solid var(--accent);
+    background: var(--soft);
+    padding: 3.6mm 5mm;
+    margin: 4mm 0;
+  }
+  .callout .k { font: 600 7.6pt/1 "IBM Plex Mono", monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 1.8mm; }
+
+  table { border-collapse: collapse; width: 100%; }
+  table.data th, table.data td { text-align: left; vertical-align: top; padding: 2.1mm 2.4mm; border-bottom: .6pt solid var(--rule); }
+  table.data thead th { font: 600 7.4pt/1.3 "IBM Plex Mono", monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border-bottom: 1pt solid var(--ink); }
+  table.data td:first-child { font-weight: 600; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm 7mm; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; }
+
+  /* state chips */
+  .st { font: 600 7.6pt/1 "IBM Plex Mono", monospace; letter-spacing: .04em; padding: 1mm 1.6mm; border-radius: 1mm; border: .8pt solid; display: inline-block; white-space: nowrap; }
+  .st-s { color: var(--gray); border-color: var(--gray); background: #F1F3F6; }
+  .st-n { color: var(--green); border-color: var(--green); background: #EAF5EF; }
+  .st-a { color: var(--amber); border-color: var(--amber); background: #FBF3E4; }
+  .st-b { color: #fff; border-color: var(--accent); background: var(--ink); }
+  .st-r { color: var(--blue); border-color: var(--blue); background: #EBF1FB; }
+
+  /* ── cover ─────────────────────────────────────────── */
+  .cover { background: #0B1622; color: #E8EDF4; padding: 20mm 18mm 16mm; }
+  .cover .org { font: 500 8pt/1 "IBM Plex Mono", monospace; letter-spacing: .2em; text-transform: uppercase; color: #9FB0C6; display: flex; justify-content: space-between; }
+  .cover .org span:last-child { color: var(--accent); }
+  .cover .kicker { margin-top: 30mm; font: 500 8.5pt/1 "IBM Plex Mono", monospace; letter-spacing: .16em; text-transform: uppercase; color: #9FB0C6; }
+  .cover h1 { font-size: 64pt; line-height: 1; margin: 5mm 0 6mm; font-weight: 600; letter-spacing: -.025em; color: #fff; }
+  .cover .sub { font-size: 16pt; line-height: 1.3; font-weight: 400; color: #E8EDF4; max-width: 128mm; margin: 0; }
+  .cover .blurb { font-size: 10pt; line-height: 1.55; color: #9FB0C6; max-width: 96mm; margin-top: 7mm; }
+  .cover .art { position: absolute; right: -2mm; top: 132mm; width: 104mm; }
+  .cover .meta { position: absolute; left: 18mm; right: 18mm; bottom: 30mm; display: grid; grid-template-columns: 1.2fr 1.2fr .8fr; gap: 6mm; border-top: .6pt solid #2A3B52; padding-top: 6mm; }
+  .cover .meta .l { font: 500 7pt/1 "IBM Plex Mono", monospace; letter-spacing: .14em; text-transform: uppercase; color: #7F92AA; margin-bottom: 2.4mm; }
+  .cover .meta .v { font-size: 11.5pt; font-weight: 600; color: #fff; line-height: 1.25; }
+  .cover .meta .d { font-size: 8.8pt; color: #9FB0C6; margin-top: 1mm; }
+  .cover .legal { position: absolute; left: 18mm; right: 18mm; bottom: 14mm; font: 400 7.2pt/1.4 "IBM Plex Mono", monospace; color: #7F92AA; letter-spacing: .02em; }
+
+  /* ── at a glance ───────────────────────────────────── */
+  .figs { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1pt solid var(--ink); }
+  .figs > div { padding: 4mm 4mm 4.4mm 0; border-bottom: .6pt solid var(--rule); }
+  .figs > div:not(:nth-child(3n+1)) { padding-left: 4mm; border-left: .6pt solid var(--rule); }
+  .figs .n { font-size: 25pt; font-weight: 600; line-height: 1; letter-spacing: -.02em; }
+  .figs .n small { font-size: 12pt; font-weight: 500; color: var(--muted); margin-left: .6mm; }
+  .figs .t { font-weight: 600; margin-top: 2.2mm; font-size: 9pt; }
+  .figs .x { font-size: 8.2pt; color: var(--muted); line-height: 1.4; margin-top: .6mm; }
+
+  .toc { margin-top: 2mm; }
+  .toc li { display: flex; align-items: baseline; gap: 3mm; padding: 1.7mm 0; border-bottom: .6pt dotted var(--rule); }
+  .toc .n { font: 600 8.4pt/1 "IBM Plex Mono", monospace; color: var(--accent); width: 7mm; }
+  .toc .t { flex: 1; }
+  .toc .p { font: 500 8.4pt/1 "IBM Plex Mono", monospace; color: var(--muted); }
+
+  .facts { background: var(--soft); padding: 4.4mm 5mm; }
+  .facts dl { margin: 0; display: grid; grid-template-columns: 30mm 1fr; gap: 1.6mm 3mm; font-size: 8.8pt; }
+  .facts dt { font: 500 7.2pt/1.6 "IBM Plex Mono", monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .facts dd { margin: 0; font-weight: 500; }
+
+  /* ── loop cards ───────────────────────────────────── */
+  .step { border-top: 1.6pt solid var(--ink); padding-top: 2.6mm; }
+  .step .i { font: 600 8pt/1 "IBM Plex Mono", monospace; color: var(--accent); letter-spacing: .06em; }
+  .step .h { font-size: 12pt; font-weight: 600; margin: 1.6mm 0 1.2mm; }
+  .step p { font-size: 8.7pt; line-height: 1.45; color: var(--ink-2); margin: 0; }
+
+  .caps { display: grid; grid-template-columns: 1fr 1fr; gap: 0 7mm; }
+  .caps > div { padding: 2.6mm 0; border-bottom: .6pt solid var(--rule); font-size: 8.9pt; }
+  .caps b { display: block; font-weight: 600; margin-bottom: .4mm; font-size: 9.2pt; }
+  .caps span { color: var(--ink-2); }
+
+  /* ── walkthrough ───────────────────────────────────── */
+  ol.walk { list-style: none; padding: 0; margin: 0; counter-reset: w; display: grid; grid-template-columns: 1fr 1fr; gap: 2.8mm 7mm; }
+  ol.walk li { counter-increment: w; position: relative; padding-left: 8mm; font-size: 8.8pt; line-height: 1.45; }
+  ol.walk li::before { content: counter(w); position: absolute; left: 0; top: .2mm; width: 5mm; height: 5mm; border-radius: 50%; background: var(--ink); color: #fff; font: 600 7.4pt/5mm "IBM Plex Mono", monospace; text-align: center; }
+  ol.walk b { font-weight: 600; }
+
+  /* ── formula ───────────────────────────────────────── */
+  .formula { background: var(--soft); padding: 3.6mm 5mm; margin: 2.6mm 0 3mm; }
+  .formula .eq { font-family: "IBM Plex Mono", monospace; font-size: 11.5pt; font-weight: 500; white-space: nowrap; }
+  .formula .eq i { font-family: "IBM Plex Sans", sans-serif; font-style: italic; }
+  .formula .w { font-size: 8.2pt; color: var(--muted); line-height: 1.45; border-top: .6pt solid var(--rule); padding-top: 2.2mm; margin-top: 2.6mm; }
+  table.data.tight th, table.data.tight td { padding-top: 1.4mm; padding-bottom: 1.4mm; }
+
+  /* ── vertical steps ────────────────────────────────── */
+  .vsteps { position: relative; margin: 2mm 0 0; }
+  .vsteps li { position: relative; padding: 0 0 3.2mm 10mm; list-style: none; font-size: 8.9pt; line-height: 1.46; }
+  .vsteps { padding: 0; }
+  .vsteps li::before { content: attr(data-n); position: absolute; left: 0; top: 0; width: 6mm; height: 6mm; border: 1pt solid var(--ink); border-radius: 50%; font: 600 7.4pt/5.6mm "IBM Plex Mono", monospace; text-align: center; background: #fff; z-index: 1; }
+  .vsteps li::after { content: ""; position: absolute; left: 3mm; top: 6mm; bottom: 0; border-left: .8pt solid var(--rule); }
+  .vsteps li:last-child::after { display: none; }
+  .vsteps li.bad::before { border-color: var(--accent); color: var(--accent); }
+  .vsteps b { font-weight: 600; }
+
+  pre.cli { font: 500 8.2pt/1.5 "IBM Plex Mono", monospace; background: var(--ink); color: #DDE5EF; padding: 3.6mm 4.4mm; margin: 3mm 0; white-space: pre-wrap; border-radius: 1.2mm; }
+  pre.cli .c { color: #7F92AA; }
+  pre.cli .k { color: #FF8A73; }
+
+  /* ── email cards ───────────────────────────────────── */
+  .mail { border: .8pt solid var(--rule); border-radius: 1.6mm; overflow: hidden; }
+  .mail .hd { padding: 2.8mm 3.6mm; background: var(--soft); border-bottom: .8pt solid var(--rule); }
+  .mail .to { font: 500 7pt/1 "IBM Plex Mono", monospace; letter-spacing: .1em; text-transform: uppercase; }
+  .mail .subj { font-weight: 600; font-size: 8.8pt; line-height: 1.35; margin-top: 1.6mm; }
+  .mail pre { margin: 0; padding: 3.2mm 3.6mm; font: 400 7.1pt/1.5 "IBM Plex Mono", monospace; white-space: pre-wrap; color: var(--ink-2); }
+  .mail.h .to { color: var(--amber); }
+  .mail.i .to { color: var(--accent); }
+
+  /* ── engineering cards ─────────────────────────────── */
+  .eng { display: grid; grid-template-columns: 1fr 1fr; gap: 0 7mm; }
+  .eng > div { padding: 2.6mm 0 2.8mm; border-top: .6pt solid var(--rule); font-size: 8.7pt; line-height: 1.45; }
+  .eng b { display: block; font-size: 9.2pt; margin-bottom: .6mm; }
+
+  /* ── comparison ────────────────────────────────────── */
+  table.cmp { font-size: 7.6pt; line-height: 1.38; table-layout: fixed; }
+  table.cmp th, table.cmp td { padding: 1.9mm 2mm; border-bottom: .6pt solid var(--rule); vertical-align: top; text-align: left; }
+  table.cmp thead th { font-size: 8pt; font-weight: 600; border-bottom: 1pt solid var(--ink); line-height: 1.25; }
+  table.cmp thead th span { display: block; font: 400 6.8pt/1.3 "IBM Plex Mono", monospace; color: var(--muted); margin-top: .8mm; }
+  table.cmp td:first-child { font-weight: 600; color: var(--ink); }
+  table.cmp td { color: var(--ink-2); }
+  table.cmp .x { background: #FDF0EC; color: var(--ink); font-weight: 500; }
+  table.cmp thead th.x { background: var(--accent); color: #fff; }
+  table.cmp thead th.x span { color: #FFE1D9; }
+
+  ol.diff { list-style: none; padding: 0; margin: 0; counter-reset: d; }
+  ol.diff li { counter-increment: d; display: grid; grid-template-columns: 9mm 1fr; padding: 2.4mm 0; border-bottom: .6pt solid var(--rule); font-size: 8.8pt; line-height: 1.45; }
+  ol.diff li::before { content: "0" counter(d); font: 600 9pt/1.4 "IBM Plex Mono", monospace; color: var(--accent); }
+  ol.diff b { font-weight: 600; }
+
+  /* ── proprietary ───────────────────────────────────── */
+  .own { background: var(--ink); color: #E8EDF4; padding: 6mm 6.4mm; border-radius: 1.6mm; }
+  .own .k { font: 600 7.4pt/1 "IBM Plex Mono", monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin-bottom: 3mm; }
+  .own p { font-size: 9.6pt; line-height: 1.55; margin: 0 0 2.6mm; }
+  .own p:last-child { margin: 0; }
+  .own .fine { font-size: 8pt; color: #9FB0C6; }
+  .author { display: grid; grid-template-columns: 17mm 1fr; gap: 5mm; align-items: center; border: .8pt solid var(--rule); border-radius: 1.6mm; padding: 4.6mm 5mm; }
+  .author .mark { width: 17mm; height: 17mm; border-radius: 50%; background: var(--ink); color: #fff; font: 600 15pt/17mm "IBM Plex Sans", sans-serif; text-align: center; letter-spacing: .02em; }
+  .author .nm { font-size: 14pt; font-weight: 600; line-height: 1.15; }
+  .author .rl { font-size: 9pt; color: var(--muted); margin-top: .6mm; }
+  .author .ct { font-size: 8.6pt; color: var(--ink-2); margin-top: 1.8mm; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════ 1. COVER ═══════════════════════════ -->
+<section class="page cover">
+  <div class="org"><span>Netpool Technologies Private Limited</span><span>Proprietary</span></div>
+
+  <div class="kicker">Technical overview · Project report</div>
+  <h1>Xiguard</h1>
+  <p class="sub">Automated DDoS detection and blackhole mitigation for MikroTik networks</p>
+  <p class="blurb">Watches every IP address across the network, learns what normal traffic looks like for each one, and isolates the address under attack — automatically, within seconds.</p>
+
+  <svg class="art" id="cover-art" viewBox="0 0 440 440" aria-hidden="true"></svg>
+
+  <div class="meta">
+    <div>
+      <div class="l">Designed &amp; developed by</div>
+      <div class="v">Vansh Chaudhary</div>
+      <div class="d">Chief Technology Officer</div>
+    </div>
+    <div>
+      <div class="l">Owned by</div>
+      <div class="v">Netpool Technologies Private Limited</div>
+      <div class="d">Proprietary technology</div>
+    </div>
+    <div>
+      <div class="l">Edition</div>
+      <div class="v">November 2026</div>
+      <div class="d">Version 1.0</div>
+    </div>
+  </div>
+  <div class="legal">© 2026 Netpool Technologies Private Limited. All rights reserved. Proprietary and confidential — not for redistribution.</div>
+</section>
+
+<!-- ═══════════════════════════ 2. AT A GLANCE ═══════════════════════════ -->
+<section class="page">
+  <div class="run-head"><span><b>Xiguard</b> · Technical overview</span><span>Netpool Technologies Pvt. Ltd. · Proprietary</span></div>
+
+  <div class="sec"><span class="num">00</span><h2>At a glance</h2></div>
+  <p class="lede">Xiguard is Netpool's in-house platform for defending its hosting network against volumetric DDoS attacks. It watches the traffic of every single IP address across all of Netpool's MikroTik edge routers, learns what normal looks like for each one, and — the moment an address is under sustained attack — blackholes just that address on the right router, verifies the block, and alerts both Netpool's NOC and the upstream ISP. When the attack is over it lifts the block and returns the IP to service on its own.</p>
+
+  <div class="figs">
+    <div><div class="n">5<small>s</small></div><div class="t">Detection cycle</div><div class="x">Every monitored IP is re-evaluated on every cycle.</div></div>
+    <div><div class="n">30<small>s</small></div><div class="t">Confirmation window</div><div class="x">An attack must be sustained before Xiguard acts (default).</div></div>
+    <div><div class="n">/32</div><div class="t">Surgical mitigation</div><div class="x">Only the attacked address is dropped — never the whole range.</div></div>
+    <div><div class="n">2</div><div class="t">NOCs alerted automatically</div><div class="x">Netpool's own NOC and the upstream ISP's NOC.</div></div>
+    <div><div class="n">0</div><div class="t">BGP sessions required</div><div class="x">Talks to MikroTik routers natively over the RouterOS API.</div></div>
+    <div><div class="n">10<small>min</small></div><div class="t">Self-recovery</div><div class="x">Blocks expire, the IP is re-checked and returned to service.</div></div>
+  </div>
+
+  <div class="grid2" style="margin-top:8mm; grid-template-columns: 1.15fr 1fr; align-items:start;">
+    <div>
+      <h3 style="margin-top:0">Contents</h3>
+      <ul class="clean toc">
+        <li><span class="n">01</span><span class="t">The problem</span><span class="p">03</span></li>
+        <li><span class="n">02</span><span class="t">What Xiguard does</span><span class="p">04</span></li>
+        <li><span class="n">03</span><span class="t">How it works — architecture</span><span class="p">05</span></li>
+        <li><span class="n">04</span><span class="t">The detection engine</span><span class="p">06</span></li>
+        <li><span class="n">05</span><span class="t">Lifecycle of a monitored IP</span><span class="p">07</span></li>
+        <li><span class="n">06</span><span class="t">Mitigation and recovery</span><span class="p">08</span></li>
+        <li><span class="n">07</span><span class="t">Notifying the right people</span><span class="p">09</span></li>
+        <li><span class="n">08</span><span class="t">Engineered for attack conditions</span><span class="p">10</span></li>
+        <li><span class="n">09</span><span class="t">How Xiguard differs from the market</span><span class="p">11</span></li>
+        <li><span class="n">10</span><span class="t">Proprietary technology &amp; authorship</span><span class="p">12</span></li>
+      </ul>
+    </div>
+    <div class="facts">
+      <h3 style="margin-top:0">Project facts</h3>
+      <dl>
+        <dt>Product</dt><dd>Xiguard</dd>
+        <dt>Category</dt><dd>DDoS detection &amp; RTBH mitigation</dd>
+        <dt>Owner</dt><dd>Netpool Technologies Private Limited</dd>
+        <dt>Created by</dt><dd>Vansh Chaudhary, CTO</dd>
+        <dt>Built for</dt><dd>Netpool's production hosting network</dd>
+        <dt>Routers</dt><dd>MikroTik CHR, RouterOS 6 and 7</dd>
+        <dt>Data source</dt><dd>MikroTik Traffic Flow (NetFlow v9)</dd>
+        <dt>Status</dt><dd>Proprietary &amp; confidential</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="run-foot"><span>© 2026 Netpool Technologies Private Limited</span><span class="pg">02 / 12</span></div>
+</section>
+
+<!-- ═══════════════════════════ 3. THE PROBLEM ═══════════════════════════ -->
+<section class="page">
+  <div class="run-head"><span><b>Xiguard</b> · Technical overview</span><span>Netpool Technologies Pvt. Ltd. · Proprietary</span></div>
+
+  <div class="sec"><span class="num">01</span><h2>The problem</h2></div>
+  <p class="lede">A hosting network carries thousands of public IP addresses. Any one of them can be hit by a distributed denial-of-service (DDoS) attack — a flood of junk traffic from thousands of compromised machines, often measured in gigabits per second.</p>
+
+  <p>The attacked server is rarely the only casualty. The flood has to cross the same routers and uplinks as every other customer's traffic, so one targeted address can take everyone behind that router offline. The longer the flood runs, the wider the outage.</p>
+
+  <figure>
+    <svg viewBox="0 0 660 214" font-family="IBM Plex Sans, Segoe UI, sans-serif">
+      <defs>
+        <marker id="pa" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#E5452B"/></marker>
+      </defs>
+      <!-- panel A -->
+      <g>
+        <rect x="0" y="0" width="320" height="214" rx="8" fill="#F3F5F8"/>
+        <text x="16" y="24" font-size="12" font-weight="600" fill="#0F1B2B">Without blackholing</text>
+        <text x="40" y="52" font-size="9" fill="#5A6577" text-anchor="middle">botnet</text>
+        <g fill="#E5452B"><circle cx="40" cy="66" r="5"/><circle cx="40" cy="88" r="5"/><circle cx="40" cy="110" r="5"/><circle cx="40" cy="132" r="5"/><circle cx="40" cy="154" r="5"/></g>
+        <g stroke="#E5452B" stroke-width="1.6" marker-end="url(#pa)">
+          <line x1="46" y1="66" x2="126" y2="104"/><line x1="46" y1="88" x2="126" y2="107"/><line x1="46" y1="110" x2="126" y2="110"/><line x1="46" y1="132" x2="126" y2="113"/><line x1="46" y1="154" x2="126" y2="116"/>
+        </g>
+        <rect x="128" y="88" width="56" height="44" rx="6" fill="#FDE3DD" stroke="#E5452B" stroke-width="1.6"/>
+        <text x="156" y="114" font-size="10.5" font-weight="600" text-anchor="middle" fill="#0F1B2B">Router</text>
+        <text x="156" y="148" font-size="9" text-anchor="middle" fill="#E5452B">overloaded</text>
+        <g stroke="#E5452B" stroke-width="3">
+          <line x1="184" y1="110" x2="244" y2="62"/><line x1="184" y1="110" x2="244" y2="96"/><line x1="184" y1="110" x2="244" y2="130"/><line x1="184" y1="110" x2="244" y2="164"/>
+        </g>
+        <g font-size="9.5" text-anchor="middle" font-weight="500">
+          <rect x="244" y="50" width="66" height="24" rx="4" fill="#FDE3DD" stroke="#E5452B"/><text x="277" y="66" fill="#0F1B2B">victim IP</text>
+          <rect x="244" y="84" width="66" height="24" rx="4" fill="#FDE3DD" stroke="#E5452B"/><text x="277" y="100" fill="#0F1B2B">customer A</text>
+          <rect x="244" y="118" width="66" height="24" rx="4" fill="#FDE3DD" stroke="#E5452B"/><text x="277" y="134" fill="#0F1B2B">customer B</text>
+          <rect x="244" y="152" width="66" height="24" rx="4" fill="#FDE3DD" stroke="#E5452B"/><text x="277" y="168" fill="#0F1B2B">customer C</text>
+        </g>
+        <text x="16" y="200" font-size="9.5" fill="#5A6577">Shared links saturate — every customer goes down.</text>
+      </g>
+      <!-- panel B -->
+      <g transform="translate(340 0)">
+        <rect x="0" y="0" width="320" height="214" rx="8" fill="#F3F5F8"/>
+        <text x="16" y="24" font-size="12" font-weight="600" fill="#0F1B2B">With Xiguard (RTBH)</text>
+        <text x="40" y="52" font-size="9" fill="#5A6577" text-anchor="middle">botnet</text>
+        <g fill="#E5452B"><circle cx="40" cy="66" r="5"/><circle cx="40" cy="88" r="5"/><circle cx="40" cy="110" r="5"/><circle cx="40" cy="132" r="5"/><circle cx="40" cy="154" r="5"/></g>
+        <g stroke="#E5452B" stroke-width="1.6" marker-end="url(#pa)">
+          <line x1="46" y1="66" x2="126" y2="104"/><line x1="46" y1="88" x2="126" y2="107"/><line x1="46" y1="110" x2="126" y2="110"/><line x1="46" y1="132" x2="126" y2="113"/><line x1="46" y1="154" x2="126" y2="116"/>
+        </g>
+        <rect x="128" y="88" width="56" height="44" rx="6" fill="#fff" stroke="#0F1B2B" stroke-width="1.4"/>
+        <circle cx="156" cy="110" r="11" fill="#0B1622" stroke="#E5452B" stroke-width="2"/>
+        <text x="156" y="148" font-size="9" text-anchor="middle" fill="#0F1B2B" font-weight="600">drops one /32</text>
+        <line x1="184" y1="110" x2="244" y2="62" stroke="#9AA6B8" stroke-width="1.2" stroke-dasharray="3 3"/>
+        <g stroke="#23895C" stroke-width="1.8">
+          <line x1="184" y1="110" x2="244" y2="96"/><line x1="184" y1="110" x2="244" y2="130"/><line x1="184" y1="110" x2="244" y2="164"/>
+        </g>
+        <g font-size="9.5" text-anchor="middle" font-weight="500">
+          <rect x="244" y="50" width="66" height="24" rx="4" fill="#fff" stroke="#9AA6B8" stroke-dasharray="3 2"/><text x="277" y="66" fill="#7E899B">victim IP</text>
+          <rect x="244" y="84" width="66" height="24" rx="4" fill="#EAF5EF" stroke="#23895C"/><text x="277" y="100" fill="#0F1B2B">customer A</text>
+          <rect x="244" y="118" width="66" height="24" rx="4" fill="#EAF5EF" stroke="#23895C"/><text x="277" y="134" fill="#0F1B2B">customer B</text>
+          <rect x="244" y="152" width="66" height="24" rx="4" fill="#EAF5EF" stroke="#23895C"/><text x="277" y="168" fill="#0F1B2B">customer C</text>
+        </g>
+        <text x="16" y="200" font-size="9.5" fill="#5A6577">Only the attacked address is dropped — the rest stay online.</text>
+      </g>
+    </svg>
+    <figcaption><b>Figure 1.</b> Blackholing sacrifices the one address that is already unreachable under attack, to keep every other customer online.</figcaption>
+  </figure>
+
+  <h3>How it was handled before Xiguard</h3>
+  <ul class="dash">
+    <li><strong>Detected late.</strong> Attacks were usually noticed only after customers reported collateral outages.</li>
+    <li><strong>Blocked by hand.</strong> An engineer had to log into the right router's CLI and add a blackhole route, one IP at a time.</li>
+    <li><strong>Escalated by phone.</strong> Asking the upstream ISP to scrub the attack needed a person to write an email or call their NOC.</li>
+    <li><strong>No single view.</strong> Traffic across several routers could not be seen in one place, and blocks were easy to forget to remove.</li>
+  </ul>
+
+  <div class="callout">
+    <div class="k">Key concept · RTBH</div>
+    <p style="margin:0"><strong>Remotely Triggered Black Hole (RTBH)</strong> routing installs a route that silently discards all traffic destined for a single <code>/32</code> address. It is the industry-standard first response to a volumetric DDoS attack. The technique itself is simple — the hard part is applying it <em>fast</em>, to the <em>right</em> address, on the <em>right</em> router, and removing it at the <em>right</em> time. That is the job Xiguard automates.</p>
+  </div>
+
+  <div class="run-foot"><span>© 2026 Netpool Technologies Private Limited</span><span class="pg">03 / 12</span></div>
+</section>
+
+<!-- ═══════════════════════════ 4. WHAT IT DOES ═══════════════════════════ -->
+<section class="page">
+  <div class="run-head"><span><b>Xiguard</b> · Technical overview</span><span>Netpool Technologies Pvt. Ltd. · Proprietary</span></div>
+
+  <div class="sec"><span class="num">02</span><h2>What Xiguard does</h2></div>
+  <p class="lede">Xiguard turns the manual runbook into a closed, automatic loop that runs for every IP address on the network, every five seconds.</p>
+
+  <div class="grid3" style="gap:6mm 6mm; margin-top:2mm;">
+    <div class="step"><div class="i">01 · Observe</div><div class="h">Collect flow data</div><p>Every MikroTik router streams flow records (NetFlow v9) to Xiguard. Nothing is installed on the routers and no traffic is mirrored.</p></div>
+    <div class="step"><div class="i">02 · Learn</div><div class="h">Baseline each IP</div><p>For each address Xiguard learns a moving baseline of its normal inbound traffic, and keeps adapting as the customer grows.</p></div>
+    <div class="step"><div class="i">03 · Detect</div><div class="h">Confirm the attack</div><p>An address is flagged only when its traffic is far above its own baseline, big enough to matter, and sustained for 30 seconds.</p></div>
+    <div class="step"><div class="i">04 · Mitigate</div><div class="h">Blackhole the /32</div><p>The attacked address is blackholed on the router that serves it, and Xiguard reads the routing table back to prove the block is live.</p></div>
+    <div class="step"><div class="i">05 · Notify</div><div class="h">Alert both NOCs</div><p>Netpool's NOC gets a technical incident report; the upstream ISP gets a formal scrubbing request with the details it needs.</p></div>
+    <div class="step"><div class="i">06 · Recover</div><div class="h">Release automatically</div><p>After the block expires the address is put on probation; if it stays clean it returns to normal and a recovery notice goes out.</p></div>
+  </div>
+
+  <h3 style="margin-top:9mm">Capabilities for the NOC team</h3>
+  <div class="caps">
+    <div><b>Multi-router control</b><span>Any number of MikroTik CHR routers are managed from one panel; designed for 20 routers and 5,000 IPs on a single server.</span></div>
+    <div><b>IP pools</b><span>Add a CIDR block (for example a <code>/24</code>) bound to a router; every host address in it is expanded into its own monitored entry.</span></div>
+    <div><b>Per-pool tuning</b><span>Sensitivity multiplier, confirmation window, blackhole duration, warm-up length and noise floors are set per pool.</span></div>
+    <div><b>Whitelist</b><span>Critical addresses still raise alerts but are never blackholed automatically.</span></div>
+    <div><b>Manual override</b><span>Operators can blackhole or release any IP from the panel, and test each router's blackhole permissions before an incident.</span></div>
+    <div><b>Live dashboard</b><span>Traffic, states and alerts stream to the browser in real time over WebSocket, with a per-IP drill-down history.</span></div>
+    <div><b>Pipeline health</b><span>A polling page shows which routers are actively exporting flows and how long each detection cycle takes.</span></div>
+    <div><b>Re-sample on demand</b><span>After a planned traffic change, a pool can be sent back to warm-up so it re-learns its baselines.</span></div>
+  </div>
+
+  <div class="run-foot"><span>© 2026 Netpool Technologies Private Limited</span><span class="pg">04 / 12</span></div>
+</section>
+
+<!-- ═══════════════════════════ 5. ARCHITECTURE ═══════════════════════════ -->
+<section class="page">
+  <div class="run-head"><span><b>Xiguard</b> · Technical overview</span><span>Netpool Technologies Pvt. Ltd. · Proprietary</span></div>
+
+  <div class="sec"><span class="num">03</span><h2>How it works — architecture</h2></div>
+  <p class="lede">Traffic data flows in from the routers over one path; enforcement flows back over another. Between them, a five-second detection cycle decides — and hands every slow action to a dedicated worker.</p>
+
+  <figure style="margin-top:2mm">
+    <svg viewBox="0 0 660 440" font-family="IBM Plex Sans, Segoe UI, sans-serif">
+      <defs>
+        <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#5A6577"/></marker>
+        <marker id="ahr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#E5452B"/></marker>
+      </defs>
+
+      <text x="70" y="16" font-family="IBM Plex Mono, monospace" font-size="9.5" letter-spacing="1" fill="#5A6577">EDGE ROUTERS · MIKROTIK ROUTEROS 6 / 7</text>
+      <g>
+        <rect x="70" y="26" width="150" height="50" rx="6" fill="#EEF2F7" stroke="#9AA6B8"/>
+        <rect x="255" y="26" width="150" height="50" rx="6" fill="#EEF2F7" stroke="#9AA6B8"/>
+        <rect x="440" y="26" width="150" height="50" rx="6" fill="#EEF2F7" stroke="#9AA6B8"/>
+        <g text-anchor="middle">
+          <text x="145" y="48" font-size="12" font-weight="600" fill="#0F1B2B">CHR #1</text>
+          <text x="330" y="48" font-size="12" font-weight="600" fill="#0F1B2B">CHR #2</text>
+          <text x="515" y="48" font-size="12" font-weight="600" fill="#0F1B2B">CHR #N</text>
+          <text x="145" y="64" font-size="9.5" fill="#5A6577">Traffic Flow exporter</text>
+          <text x="330" y="64" font-size="9.5" fill="#5A6577">Traffic Flow exporter</text>
+          <text x="515" y="64" font-size="9.5" fill="#5A6577">Traffic Flow exporter</text>
+        </g>
+      </g>
+
+      <!-- flow export bus -->
+      <g fill="none" stroke="#5A6577" stroke-width="1.4">
+        <path d="M515 76 V104 H330"/>
+        <path d="M330 76 V104 H145"/>
+        <path d="M145 76 V148" marker-end="url(#ah)"/>
+      </g>
+      <text x="156" y="128" font-size="9.5" fill="#5A6577">NetFlow v9 over UDP 2055 · flows flushed every 5 s</text>
+
+      <!-- tier 2 -->
+      <rect x="70" y="150" width="150" height="58" rx="6" fill="#fff" stroke="#0F1B2B" stroke-width="1.2"/>
+      <rect x="255" y="150" width="150" height="58" rx="6" fill="#fff" stroke="#0F1B2B" stroke-width="1.2"/>
+      <rect x="440" y="150" width="150" height="58" rx="6" fill="#0F1B2B"/>
+      <g text-anchor="middle">
+        <text x="145" y="175" font-size="12" font-weight="600" fill="#0F1B2B">Flow collector</text>
+        <text x="145" y="192" font-size="9.5" fill="#5A6577">decodes NetFlow v9</text>
+        <text x="330" y="175" font-size="12" font-weight="600" fill="#0F1B2B">Redis 7</text>
+        <text x="330" y="192" font-size="9.5" fill="#5A6577">per-IP traffic counters</text>
+        <text x="515" y="175" font-size="12" font-weight="600" fill="#fff">Detection engine</text>
+        <text x="515" y="192" font-size="9.5" fill="#B8C5D6">every 5 s · per-IP state</text>
+      </g>
+      <g fill="none" stroke="#5A6577" stroke-width="1.4" marker-end="url(#ah)">
+        <path d="M220 179 H253"/>
+        <path d="M405 179 H438"/>
+      </g>
+
+      <!-- dispatch bus -->
+      <g fill="none" stroke="#5A6577" stroke-width="1.4" marker-end="url(#ah)">
+        <path d="M515 208 V270"/>
+        <path d="M515 240 H330 V270"/>
+        <path d="M330 240 H145 V270"/>
+      </g>
+      <text x="422" y="233" font-size="9.5" fill="#5A6577" text-anchor="middle">decisions handed to workers</text>
+
+      <!-- tier 3 -->
+      <rect x="70" y="272" width="150" height="58" rx="6" fill="#FDF0EC" stroke="#E5452B" stroke-width="1.4"/>
+      <rect x="255" y="272" width="150" height="58" rx="6" fill="#FBF3E4" stroke="#C98210" stroke-width="1.4"/>
+      <rect x="440" y="272" width="150" height="58" rx="6" fill="#EBF1FB" stroke="#2C66D0" stroke-width="1.4"/>
+      <g text-anchor="middle">
+        <text x="145" y="297" font-size="12" font-weight="600" fill="#0F1B2B">Mitigation worker</text>
+        <text x="145" y="314" font-size="9.5" fill="#5A6577">critical queue · top priority</text>
+        <text x="330" y="297" font-size="12" font-weight="600" fill="#0F1B2B">Alert worker</text>
+        <text x="330" y="314" font-size="9.5" fill="#5A6577">email queue · 5-min dedup</text>
+        <text x="515" y="297" font-size="12" font-weight="600" fill="#0F1B2B">PostgreSQL 16</text>
+        <text x="515" y="314" font-size="9.5" fill="#5A6577">state · history · alerts</text>
+      </g>
+
+      <!-- enforcement loop back to routers -->
+      <path d="M70 301 H34 V51 H68" fill="none" stroke="#E5452B" stroke-width="1.8" marker-end="url(#ahr)"/>
+      <text x="25" y="176" font-size="9.5" font-weight="600" fill="#E5452B" text-anchor="middle" transform="rotate(-90 25 176)">RouterOS API · push &amp; verify blackhole</text>
+
+      <!-- tier 4 -->
+      <g fill="none" stroke="#5A6577" stroke-width="1.4">
+        <path d="M330 330 V354 H259 V376" marker-end="url(#ah)"/>
+        <path d="M330 354 H389 V376" marker-end="url(#ah)"/>
+        <path d="M526 330 V376" marker-end="url(#ah)"/>
+      </g>
+      <text x="532" y="358" font-size="9.5" fill="#5A6577">WebSocket live feed</text>
+      <rect x="200" y="378" width="118" height="50" rx="6" fill="#fff" stroke="#9AA6B8"/>
+      <rect x="330" y="378" width="118" height="50" rx="6" fill="#fff" stroke="#9AA6B8"/>
+      <rect x="462" y="378" width="128" height="50" rx="6" fill="#fff" stroke="#9AA6B8"/>
+      <g text-anchor="middle">
+        <text x="259" y="400" font-size="11" font-weight="600" fill="#0F1B2B">Netpool NOC</text>
+        <text x="259" y="415" font-size="9.5" fill="#5A6577">incident report</text>
+        <text x="389" y="400" font-size="11" font-weight="600" fill="#0F1B2B">Upstream ISP NOC</text>
+        <text x="389" y="415" font-size="9.5" fill="#5A6577">scrubbing request</text>
+        <text x="526" y="400" font-size="11" font-weight="600" fill="#0F1B2B">NOC dashboard</text>
+        <text x="526" y="415" font-size="9.5" fill="#5A6577">live traffic &amp; states</text>
+      </g>
+    </svg>
+    <figcaption><b>Figure 2.</b> Data path (top, grey) and enforcement path (left, red). Routers are only ever contacted by the workers, never by the detection cycle itself.</figcaption>
+  </figure>
+
+  <ol class="walk" style="margin-top:5mm">
+    <li><b>Export.</b> Each MikroTik router's built-in Traffic Flow feature sends NetFlow v9 records over UDP to Xiguard. No agent runs on the router.</li>
+    <li><b>Collect.</b> The flow collector decodes NetFlow v9 templates and records and adds each flow's bytes and packets to per-IP counters in Redis — inbound against the destination, outbound against the source — in one-second batches.</li>
+    <li><b>Evaluate.</b> Every 5 s the detection cycle atomically reads and resets each IP's counters, converts them to bits and packets per second, and runs the per-IP detector.</li>
+    <li><b>Hand off.</b> Blackhole jobs go to a top-priority <em>critical</em> queue and emails to a separate <em>email</em> queue. Detection never waits on a router or a mail server.</li>
+    <li><b>Enforce.</b> The mitigation worker logs into the router over the RouterOS API (port 8728, or 8729 with TLS), installs the <code>/32</code> blackhole route and verifies it.</li>
+    <li><b>Record &amp; display.</b> Samples, states and alerts are stored in PostgreSQL and pushed live to the dashboard. A separate job health-checks every router each minute.</li>
+  </ol>
+
+  <div class="run-foot"><span>© 2026 Netpool Technologies Private Limited</span><span class="pg">05 / 12</span></div>
+</section>
+
+<!-- ═══════════════════════════ 6. DETECTION ENGINE ═══════════════════════════ -->
+<section class="page">
+  <div class="run-head"><span><b>Xiguard</b> · Technical overview</span><span>Netpool Technologies Pvt. Ltd. · Proprietary</span></div>
+
+  <div class="sec"><span class="num">04</span><h2>The detection engine</h2></div>
+  <p class="lede">A fixed threshold is wrong for almost everyone: too tight for a busy server, too loose for a quiet one. Xiguard judges each IP only against its own history.</p>
+
+  <h3 style="margin-top:0">Learning what normal looks like</h3>
+  <p>For every address, Xiguard keeps an <strong>exponentially weighted moving average (EWMA)</strong> of inbound traffic — a running baseline that weighs recent samples more than old ones, so it follows a customer's natural growth without reacting to momentary bursts.</p>
+  <div class="formula">
+    <div class="eq"><i>B</i><sub>new</sub> = α·<i>x</i> + (1 − α)·<i>B</i><sub>old</sub>&nbsp;&nbsp;&nbsp;α = 2 / (<i>N</i> + 1)</div>
+    <div class="w"><i>x</i> = latest 5-second sample · <i>N</i> = 720 samples (one hour) → α ≈ 0.0028. Until an IP has <i>N</i> samples, a running average (α = 1/(<i>n</i>+1)) lets the baseline converge quickly. While an IP is blackholed its baseline is <strong>frozen</strong>, so neither the flood nor the silence after the block can distort it.</div>
+  </div>
+
+  <h3>Warm-up before arming</h3>
+  <p>Every newly added address starts in a <span class="st st-s">SAMPLING</span> state for 120 samples (10 minutes by default). It learns, but it can neither alert nor blackhole — so adding a new /24 never produces a burst of false alarms.</p>
+
+  <h3>Four conditions, all required</h3>
+  <table class="data tight" style="font-size:8.8pt">
+    <thead><tr><th style="width:35%">Condition</th><th style="width:12%">Default</th><th>Why it exists</th></tr></thead>
+    <tbody>
+      <tr><td>Traffic &gt; baseline × multiplier</td><td class="mono">3×</td><td>The traffic must be abnormal <em>for this particular IP</em>.</td></tr>
+      <tr><td>Baseline ≥ minimum baseline floor</td><td class="mono">1 Mbps</td><td>Near-idle IPs have meaningless multiples — 3× of almost nothing is still nothing.</td></tr>
+      <tr><td>Traffic ≥ minimum spike floor</td><td class="mono">10 Mbps</td><td>Ignore spikes too small to threaten the network.</td></tr>
+      <tr><td>Held continuously for the window</td><td class="mono">30 s</td><td>Ignore short legitimate bursts — backups, large downloads, crawlers.</td></tr>
+    </tbody>
+  </table>
+  <p class="small muted" style="margin-top:2mm">The threshold is computed from the baseline <em>before</em> the new sample is blended in, so a sudden flood can never drag its own threshold upward and hide itself.</p>
+
+  <figure style="margin-top:3mm">
+    <svg viewBox="0 0 660 226" font-family="IBM Plex Sans, Segoe UI, sans-serif">
+      <defs>
+        <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#0F1B2B" stroke-width="1" opacity=".13"/></pattern>
+      </defs>
+      <!-- regions -->
+      <rect x="205" y="14" width="60" height="176" fill="#C98210" opacity=".12"/>
+      <rect x="265" y="14" width="205" height="176" fill="url(#hatch)"/>
+      <rect x="265" y="14" width="205" height="176" fill="#0F1B2B" opacity=".04"/>
+      <rect x="470" y="14" width="70" height="176" fill="#2C66D0" opacity=".10"/>
+      <!-- axes -->
+      <line x1="46" y1="190" x2="650" y2="190" stroke="#0F1B2B" stroke-width="1"/>
+      <line x1="46" y1="14" x2="46" y2="190" stroke="#0F1B2B" stroke-width="1"/>
+      <rect x="40" y="94" width="12" height="7" fill="#fff"/>
+      <path d="M40 97 L52 92 M40 103 L52 98" stroke="#0F1B2B" stroke-width="1"/>
+      <path d="M362 184 L356 196 M368 184 L362 196" stroke="#0F1B2B" stroke-width="1"/>
+      <!-- threshold -->
+      <line x1="46" y1="130" x2="650" y2="130" stroke="#C98210" stroke-width="1.4" stroke-dasharray="5 4"/>
+      <!-- baseline -->
+      <path d="M46 171 L205 170 L265 169 L470 169 L650 169" fill="none" stroke="#7E899B" stroke-width="2"/>
+      <!-- traffic -->
+      <polyline fill="none" stroke="#E5452B" stroke-width="1.6" points="46,168 56,173 66,166 76,172 86,169 96,175 106,166 116,171 126,167 136,174 146,168 156,172 166,165 176,171 186,168 196,173 200,170 205,36 215,30 225,38 235,32 245,40 255,31 265,35"/>
+      <polyline fill="none" stroke="#E5452B" stroke-width="1.2" stroke-dasharray="3 3" opacity=".55" points="265,35 290,38 320,31 350,37 380,33 410,39 440,32 462,36 470,170"/>
+      <polyline fill="none" stroke="#E5452B" stroke-width="1.6" points="470,170 480,166 490,172 500,168 510,174 520,167 530,171 540,169 550,165 560,172 570,168 580,173 590,167 600,171 610,166 620,172 630,168 640,171 650,169"/>
+      <!-- event markers -->
+      <g stroke-width="1.2">
+        <line x1="205" y1="14" x2="205" y2="190" stroke="#5A6577" stroke-dasharray="2 2"/>
+        <line x1="265" y1="14" x2="265" y2="190" stroke="#E5452B"/>
+        <line x1="470" y1="14" x2="470" y2="190" stroke="#2C66D0"/>
+        <line x1="540" y1="14" x2="540" y2="190" stroke="#23895C"/>
+      </g>
+      <!-- y labels -->
+      <g font-size="9" fill="#5A6577" text-anchor="end">
+        <text x="42" y="40">2.4 Gbps</text>
+        <text x="42" y="133">120 Mbps</text>
+        <text x="42" y="173">40 Mbps</text>
+      </g>
+      <!-- region labels -->
+      <g font-size="9" text-anchor="middle">
+        <text x="235" y="150" font-weight="600" fill="#C98210">held 30 s</text>
+        <text x="367" y="104" font-weight="600" fill="#0F1B2B">BLACKHOLED · 10 min</text>
+        <text x="367" y="117" fill="#5A6577">baseline frozen · flood dropped at router</text>
+        <text x="505" y="104" font-weight="600" fill="#2C66D0">probation</text>
+        <text x="505" y="117" fill="#2C66D0">60 s</text>
+      </g>
+      <!-- legend -->
+      <g font-size="9" fill="#0F1B2B">
+        <line x1="58" y1="24" x2="76" y2="24" stroke="#E5452B" stroke-width="1.8"/><text x="81" y="27">inbound traffic to the IP</text>
+        <line x1="58" y1="40" x2="76" y2="40" stroke="#7E899B" stroke-width="2"/><text x="81" y="43">learned baseline</text>
+        <line x1="58" y1="56" x2="76" y2="56" stroke="#C98210" stroke-width="1.4" stroke-dasharray="5 4"/><text x="81" y="59">alert threshold (baseline × 3)</text>
+      </g>
+      <!-- x labels -->
+      <g font-size="9" fill="#5A6577">
+        <text x="201" y="205" text-anchor="end">attack starts</text>
+        <text x="269" y="205" fill="#E5452B" font-weight="600">blackholed · NOCs alerted</text>
+        <text x="466" y="205" text-anchor="end" fill="#2C66D0">route lifted</text>
+        <text x="544" y="205" fill="#23895C" font-weight="600">NORMAL again</text>
+        <text x="650" y="220" text-anchor="end">time →</text>
+      </g>
+    </svg>
+    <figcaption><b>Figure 3.</b> Illustrative attack on an IP whose normal load is 40 Mbps. The 2.4 Gbps flood is shown off-scale and the time axis is compressed during the blackhole.</figcaption>
+  </figure>
+
+  <div class="run-foot"><span>© 2026 Netpool Technologies Private Limited</span><span class="pg">06 / 12</span></div>
+</section>
+
+<!-- ═══════════════════════════ 7. LIFECYCLE ═══════════════════════════ -->
+<section class="page">
+  <div class="run-head"><span><b>Xiguard</b> · Technical overview</span><span>Netpool Technologies Pvt. Ltd. · Proprietary</span></div>
+
+  <div class="sec"><span class="num">05</span><h2>Lifecycle of a monitored IP</h2></div>
+  <p class="lede">Every address moves through a small, explicit state machine. The detector only <em>decides</em>; separate workers carry out each decision.</p>
+
+  <figure style="margin-top:1mm">
+    <svg viewBox="0 46 660 236" font-family="IBM Plex Sans, Segoe UI, sans-serif">
+      <defs>
+        <marker id="sa" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#5A6577"/></marker>
+        <marker id="sr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#E5452B"/></marker>
+      </defs>
+      <g font-family="IBM Plex Mono, monospace" font-size="11.5" font-weight="600" text-anchor="middle">
+        <rect x="6" y="110" width="108" height="46" rx="6" fill="#F1F3F6" stroke="#7E899B" stroke-width="1.6"/><text x="60" y="137" fill="#7E899B">SAMPLING</text>
+        <rect x="176" y="110" width="108" height="46" rx="6" fill="#EAF5EF" stroke="#23895C" stroke-width="1.6"/><text x="230" y="137" fill="#23895C">NORMAL</text>
+        <rect x="356" y="110" width="108" height="46" rx="6" fill="#FBF3E4" stroke="#C98210" stroke-width="1.6"/><text x="410" y="137" fill="#C98210">ALERT</text>
+        <rect x="540" y="110" width="108" height="46" rx="6" fill="#0F1B2B" stroke="#E5452B" stroke-width="2"/><text x="594" y="137" fill="#fff">BLACKHOLED</text>
+        <rect x="356" y="228" width="108" height="46" rx="6" fill="#EBF1FB" stroke="#2C66D0" stroke-width="1.6"/><text x="410" y="255" fill="#2C66D0">RECOVERING</text>
+      </g>
+      <g fill="none" stroke="#5A6577" stroke-width="1.4" marker-end="url(#sa)">
+        <path d="M60 82 V108"/>
+        <path d="M114 133 H174"/>
+        <path d="M284 133 H354"/>
+        <path d="M464 133 H538"/>
+        <path d="M594 156 V251 H466"/>
+        <path d="M394 156 V226"/>
+        <path d="M426 228 V158"/>
+        <path d="M356 251 H230 V158"/>
+      </g>
+      <path d="M594 110 C594 64 410 64 410 108" fill="none" stroke="#E5452B" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#sr)"/>
+      <g font-size="9.5" fill="#5A6577" text-anchor="middle">
+        <text x="60" y="74" font-weight="600" fill="#0F1B2B">new IP added</text>
+        <text x="144" y="125">warm-up</text><text x="144" y="149">complete</text>
+        <text x="319" y="125">spike held</text><text x="319" y="149">≥ 30 s</text>
+        <text x="501" y="125">auto-blackhole</text><text x="501" y="149">if allowed</text>
+        <text x="530" y="268">timer expires · route lifted</text>
+        <text x="293" y="268">clean 60 s · recovery email</text>
+        <text x="502" y="58" fill="#E5452B">route not verified → roll back</text>
+      </g>
+      <g font-size="9.5" fill="#5A6577">
+        <text x="388" y="188" text-anchor="end">traffic</text><text x="388" y="200" text-anchor="end">subsides</text>
+        <text x="432" y="188">attack</text><text x="432" y="200">resumes</text>
+      </g>
+    </svg>
+    <figcaption><b>Figure 4.</b> Per-IP state machine. An alert is always raised on entering ALERT; the blackhole follows immediately unless the IP is whitelisted or the pool has auto-blackhole switched off.</figcaption>
+  </figure>
+
+  <table class="data tight" style="font-size:8.7pt; margin-top:4mm">
+    <thead><tr><th style="width:19%">State</th><th style="width:25%">Meaning</th><th>What Xiguard does</th></tr></thead>
+    <tbody>
+      <tr><td><span class="st st-s">SAMPLING</span></td><td>Newly added, still learning</td><td>Updates the baseline; never alerts or blocks.</td></tr>
+      <tr><td><span class="st st-n">NORMAL</span></td><td>Armed and healthy</td><td>Updates the baseline and checks the four conditions every cycle.</td></tr>
+      <tr><td><span class="st st-a">ALERT</span></td><td>Attack confirmed</td><td>Records the alert, emails both NOCs, and blackholes unless whitelisted.</td></tr>
+      <tr><td><span class="st st-b">BLACKHOLED</span></td><td><code>/32</code> dropped at the router</td><td>Freezes the baseline; lifts the route once the timer (default 10 min) expires.</td></tr>
+      <tr><td><span class="st st-r">RECOVERING</span></td><td>Released, on probation</td><td>Needs 60 s of clean traffic to return to NORMAL; a renewed attack is re-blocked at once, with no fresh 30 s wait.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>One attack, minute by minute</h3>
+  <table class="data tight" style="font-size:8.7pt">
+    <tbody>
+      <tr><td class="mono" style="width:15%">00:00</td><td>A 2.4 Gbps flood hits an IP whose baseline is 40 Mbps (threshold 120 Mbps).</td></tr>
+      <tr><td class="mono">≤ 00:05</td><td>First 5-second sample above all floors — the confirmation timer starts.</td></tr>
+      <tr><td class="mono">≈ 00:35</td><td>Held for 30 s → <span class="st st-b">BLACKHOLED</span>. Blackhole job and alert emails are dispatched in parallel.</td></tr>
+      <tr><td class="mono">+ seconds</td><td>Route verified on the router; Netpool's NOC and the ISP NOC receive their messages.</td></tr>
+      <tr><td class="mono">≈ 10:35</td><td>Timer expires; the Xiguard route is removed and verified gone → <span class="st st-r">RECOVERING</span>.</td></tr>
+      <tr><td class="mono">≈ 11:35</td><td>Clean for 60 s → <span class="st st-n">NORMAL</span>; a recovery notice goes to both NOCs.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="run-foot"><span>© 2026 Netpool Technologies Private Limited</span><span class="pg">07 / 12</span></div>
+</section>
+
+<!-- ═══════════════════════════ 8. MITIGATION ═══════════════════════════ -->
+<section class="page">
+  <div class="run-head"><span><b>Xiguard</b> · Technical overview</span><span>Netpool Technologies Pvt. Ltd. · Proprietary</span></div>
+
+  <div class="sec"><span class="num">06</span><h2>Mitigation and recovery</h2></div>
+  <p class="lede">Detection is worthless if the block never lands. Xiguard treats the router as something that can fail, and checks its own work before it reports success.</p>
+
+  <div class="grid2" style="grid-template-columns: 1.05fr 1fr; gap: 0 9mm; align-items:start">
+    <div>
+      <h3 style="margin-top:0">Applying a blackhole</h3>
+      <ul class="vsteps">
+        <li data-n="1"><b>Dispatch.</b> The job is queued on the critical queue at top priority; detection for every other IP carries on in parallel.</li>
+        <li data-n="2"><b>Connect.</b> Router credentials are decrypted in memory only (stored with AES-256-GCM) and a RouterOS API session is opened, optionally over TLS.</li>
+        <li data-n="3"><b>Install.</b> A <code>/32</code> blackhole route is added, tagged with an <code>Xiguard</code> comment. RouterOS 6 and 7 spell blackhole routes differently, so Xiguard tries <code>type=blackhole</code>, then <code>blackhole=yes</code>, then <code>gateway=blackhole</code> until the router accepts one.</li>
+        <li data-n="4"><b>Verify.</b> The routing table is read back. Success is reported only if the Xiguard route is really present.</li>
+        <li data-n="5"><b>Retry.</b> Up to three attempts, two seconds apart.</li>
+        <li data-n="6" class="bad"><b>Roll back honestly.</b> If the route still isn't there, the IP returns to ALERT and a critical “blackhole failed” alert is raised — the dashboard never shows protection that does not exist.</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="margin-top:0">What lands on the router</h3>
+<pre class="cli" style="font-size:8pt"><span class="c"># sent by Xiguard over the RouterOS API</span>
+<span class="k">/ip route add</span> \
+  dst-address=203.0.113.25/32 \
+  type=blackhole \
+  comment="Xiguard auto-blackhole …"</pre>
+      <p class="small muted">The comment carries a UTC timestamp. Example values use documentation-reserved address space (RFC 5737).</p>
+
+      <h3>Releasing it safely</h3>
+      <ul class="dash">
+        <li><strong>Automatic expiry.</strong> Every 30 s an expiry job lifts blackholes whose duration (default 10 min) has passed.</li>
+        <li><strong>Only its own routes.</strong> Removal matches the <code>Xiguard</code> comment, so routes added by engineers are never touched — and removal is verified too.</li>
+        <li><strong>Probation.</strong> A released IP must stay clean for 60 s; if the attack resumes it is re-blackholed immediately.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 style="margin-top:6mm">Operator safety controls</h3>
+  <div class="caps">
+    <div><b>Whitelist</b><span>Critical addresses (resolvers, management, key customers) still alert but are never blocked automatically.</span></div>
+    <div><b>Per-pool auto-blackhole switch</b><span>A pool can run in alert-only mode while its thresholds are being tuned.</span></div>
+    <div><b>Manual blackhole / release</b><span>Any IP can be blocked or released from the panel, through the same verified path.</span></div>
+    <div><b>Test blackhole</b><span>A one-click test per router confirms the API user can really add and remove routes — before it matters.</span></div>
+  </div>
+
+  <div class="run-foot"><span>© 2026 Netpool Technologies Private Limited</span><span class="pg">08 / 12</span></div>
+</section>
+
+<!-- ═══════════════════════════ 9. NOTIFICATIONS ═══════════════════════════ -->
+<section class="page">
+  <div class="run-head"><span><b>Xiguard</b> · Technical overview</span><span>Netpool Technologies Pvt. Ltd. · Proprietary</span></div>
+
+  <div class="sec"><span class="num">07</span><h2>Notifying the right people</h2></div>
+  <p class="lede">One attack, two audiences, two very different messages — sent automatically and in parallel.</p>
+
+  <div class="callout" style="margin-top:0">
+    <div class="k">Why two emails?</div>
+    <p style="margin:0">A blackhole on Netpool's own router protects everything behind it, but the flood still travels down the ISP's link to reach that router. Only the upstream provider can filter it before it fills the pipe. So Xiguard sends Netpool's NOC a technical incident report, and sends the ISP's NOC a formal, ready-to-act scrubbing request with exactly the details it needs — the step that used to require a phone call.</p>
+  </div>
+
+  <div class="grid2" style="gap:5mm; margin-top:5mm; align-items:start">
+    <div class="mail h">
+      <div class="hd"><div class="to">To · Netpool NOC</div><div class="subj">[Xiguard ALERT] DDoS detected on 203.0.113.25</div></div>
+<pre>ALERT: Volumetric DDoS Attack Detected
+
+Target IP:     203.0.113.25
+Pool:          203.0.113.0/24
+CHR Node:      CHR-01 (edge)
+Detected At:   2026-11-12 14:32:05 UTC
+
+Traffic Analysis:
+  Baseline:    40,000,000 bps (40.00 Mbps)
+  Current:     2,400,000,000 bps (2.40 Gbps)
+  Multiplier:  60.0x
+  Threshold:   3.0x
+
+Action Taken:  auto_blackhole
+Blackhole Exp: 2026-11-12 14:42:05 UTC
+
+This is an automated alert from Xiguard.</pre>
+    </div>
+    <div class="mail i">
+      <div class="hd"><div class="to">To · Upstream ISP NOC</div><div class="subj">[URGENT] Manual scrubbing requested — 203.0.113.25 — AS64500</div></div>
+<pre>Dear NOC Team,
+
+We are observing a possible volumetric DDoS
+attack targeting the following IP address on
+our network:
+
+  IP Address:     203.0.113.25
+  AS Number:      AS64500 (Netpool)
+  Approx. Volume: ~2.40 Gbps inbound
+  Detection Time: 2026-11-12 14:32:05 UTC
+  Attack Type:    Volumetric (60.0x baseline)
+
+We kindly request immediate manual scrubbing
+for this IP. We have applied a local
+blackhole as an interim measure.
+
+Please acknowledge receipt and provide an
+estimated time for scrubbing activation.
+
+Regards, Netpool NOC · Ref: ALT-3f9a2c1e</pre>
+    </div>
+  </div>
+  <p class="small muted" style="margin-top:2mm">Abridged; example values use documentation-reserved addresses and AS numbers (RFC 5737, RFC 5398). Sender details, AS number and contact information are configured per deployment.</p>
+
+  <h3>Built so alerts never get in the way</h3>
+  <ul class="dash">
+    <li><strong>Separate worker.</strong> Emails are sent by their own worker on their own queue, so a slow mail server can never delay detection or blocking.</li>
+    <li><strong>Parallel delivery.</strong> Both messages are sent at the same time over async SMTP, each through its own configurable SMTP account.</li>
+    <li><strong>De-duplication.</strong> An IP will not trigger repeat alert emails within a 5-minute window, so an attack that flaps does not flood inboxes.</li>
+    <li><strong>Closure.</strong> When the IP returns to NORMAL, both NOCs receive a recovery notice confirming the block is removed and traffic is back to its baseline.</li>
+    <li><strong>Test sends.</strong> Each SMTP configuration can be verified from the settings page with a test email.</li>
+  </ul>
+
+  <div class="run-foot"><span>© 2026 Netpool Technologies Private Limited</span><span class="pg">09 / 12</span></div>
+</section>
+
+<!-- ═══════════════════════════ 10. ENGINEERING ═══════════════════════════ -->
+<section class="page">
+  <div class="run-head"><span><b>Xiguard</b> · Technical overview</span><span>Netpool Technologies Pvt. Ltd. · Proprietary</span></div>
+
+  <div class="sec"><span class="num">08</span><h2>Engineered for attack conditions</h2></div>
+  <p class="lede">A protection system is tested at the worst possible moment — when links are saturated and every router is under load. Xiguard is designed around that moment.</p>
+
+  <div class="eng">
+    <div><b>Detection never waits</b>Routers and mail servers are the slowest things during an attack. The detection cycle never calls either; it only queues work for others.</div>
+    <div><b>Three isolated queues</b><em>default</em> for polling and housekeeping, <em>critical</em> for blackhole push and release, <em>email</em> for alerts — each served by its own workers.</div>
+    <div><b>Lossless counting</b>A Redis Lua script reads and clears each IP's counters in one atomic step, so no flow is lost or counted twice between cycles.</div>
+    <div><b>Burst-ready collector</b>A 16 MiB UDP receive buffer and one-second batched writes absorb the surge of flow records generated by the very attack being measured.</div>
+    <div><b>History that scales</b>Per-IP samples go into daily PostgreSQL partitions; expired days are dropped in one step. 30 days of traffic, 90 days of alerts by default.</div>
+    <div><b>Secrets protected</b>Router and SMTP passwords encrypted with AES-256-GCM (fresh nonce per value); bcrypt-hashed admin passwords; HttpOnly session cookies; panel kept on a management VLAN.</div>
+    <div><b>Self-healing services</b>Every service restarts automatically, health checks gate start-up, and database migrations apply themselves on boot.</div>
+    <div><b>One-command deployment</b>The entire platform — nine services — comes up with a single <code>docker compose up</code> on one Linux server.</div>
+  </div>
+
+  <h3 style="margin-top:6mm">Technology stack</h3>
+  <table class="data tight" style="font-size:8.8pt">
+    <thead><tr><th style="width:26%">Layer</th><th>Technology</th></tr></thead>
+    <tbody>
+      <tr><td>Flow ingestion</td><td>Python 3.11 asyncio UDP server with a purpose-built NetFlow v9 parser (RFC 3954)</td></tr>
+      <tr><td>API &amp; real-time</td><td>FastAPI, WebSocket, Redis pub/sub</td></tr>
+      <tr><td>Scheduling &amp; workers</td><td>Celery and Celery Beat, Redis broker</td></tr>
+      <tr><td>Storage</td><td>PostgreSQL 16 (partitioned time-series), Redis 7</td></tr>
+      <tr><td>Router control</td><td>MikroTik RouterOS API (librouteros), plain or TLS</td></tr>
+      <tr><td>Alerting</td><td>Async SMTP (aiosmtplib) with Jinja2 templates</td></tr>
+      <tr><td>Web panel</td><td>Next.js 14, React 18, Tailwind CSS, Recharts, Zustand</td></tr>
+      <tr><td>Delivery</td><td>Docker Compose, Caddy reverse proxy with automatic HTTPS</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Design targets <span class="muted" style="font-weight:400; font-size:8.4pt">· single-server installation, from the system design specification</span></h3>
+  <div class="figs" style="grid-template-columns: repeat(4, 1fr)">
+    <div><div class="n" style="font-size:19pt">20</div><div class="x">routers per installation</div></div>
+    <div style="padding-left:4mm;border-left:.6pt solid var(--rule)"><div class="n" style="font-size:19pt">5,000</div><div class="x">monitored IP addresses</div></div>
+    <div style="padding-left:4mm;border-left:.6pt solid var(--rule)"><div class="n" style="font-size:19pt">&lt; 5<small>s</small></div><div class="x">from decision to route push</div></div>
+    <div style="padding-left:4mm;border-left:.6pt solid var(--rule)"><div class="n" style="font-size:19pt">&lt; 10<small>s</small></div><div class="x">from decision to SMTP hand-off</div></div>
+  </div>
+
+  <div class="run-foot"><span>© 2026 Netpool Technologies Private Limited</span><span class="pg">10 / 12</span></div>
+</section>
+
+<!-- ═══════════════════════════ 11. MARKET ═══════════════════════════ -->
+<section class="page">
+  <div class="run-head"><span><b>Xiguard</b> · Technical overview</span><span>Netpool Technologies Pvt. Ltd. · Proprietary</span></div>
+
+  <div class="sec"><span class="num">09</span><h2>How Xiguard differs from the market</h2></div>
+  <p class="lede">Established DDoS products are built for large carriers and multi-vendor backbones. Xiguard is purpose-built for one environment — a hosting network running MikroTik routers — and goes deeper there.</p>
+
+  <table class="cmp">
+    <colgroup><col style="width:17%"><col style="width:22%"><col style="width:20.3%"><col style="width:20.3%"><col style="width:20.4%"></colgroup>
+    <thead>
+      <tr>
+        <th></th>
+        <th class="x">Xiguard<span>Netpool, in-house</span></th>
+        <th>Enterprise DDoS appliances<span>e.g. NETSCOUT Arbor</span></th>
+        <th>Cloud scrubbing services<span>e.g. Cloudflare, Akamai</span></th>
+        <th>Generic flow-based detectors<span>e.g. FastNetMon, Wanguard</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Footprint</td><td class="x">One self-hosted server, Docker Compose</td><td>Dedicated or licensed virtual appliances</td><td>Provider's global network</td><td>Self-hosted server</td></tr>
+      <tr><td>Mitigation on MikroTik</td><td class="x">Direct via RouterOS API — no BGP session needed</td><td>Via BGP or FlowSpec to supported routers</td><td>Traffic diverted to the provider via BGP or tunnels</td><td>Usually via a BGP session or custom scripts</td></tr>
+      <tr><td>RouterOS 6 vs 7 differences</td><td class="x">Handled automatically</td><td>Not a design focus</td><td>Not applicable</td><td>Depends on the integration</td></tr>
+      <tr><td>Per-IP learned baseline</td><td class="x">Every IP, with mandatory warm-up and noise floors</td><td>Yes (traffic profiling)</td><td>Provider-managed</td><td>Varies by product and edition</td></tr>
+      <tr><td>Confirms the block landed</td><td class="x">Routing-table read-back, honest rollback</td><td>Varies</td><td>Provider-managed</td><td>Varies</td></tr>
+      <tr><td>Upstream ISP escalation</td><td class="x">Automatic formal scrubbing request (IP, ASN, volume)</td><td>Separate workflow</td><td>Not applicable — provider scrubs</td><td>Generic notifications</td></tr>
+      <tr><td>Cost model</td><td class="x">Built in-house; no per-Gbps or per-IP licence</td><td>Premium hardware and licences</td><td>Recurring subscription, often bandwidth-based</td><td>Free community tiers; paid editions</td></tr>
+      <tr><td>Where traffic data lives</td><td class="x">Stays on Netpool infrastructure</td><td>On-premises</td><td>Passes through the provider</td><td>On-premises</td></tr>
+    </tbody>
+  </table>
+  <p class="small muted" style="margin-top:2mm; font-size:7.4pt">Comparison reflects typical deployments and publicly described product positioning; capabilities differ between products, editions and versions. Product names are trademarks of their respective owners and are cited only as examples of each category.</p>
+
+  <h3 style="margin-top:5mm">Five things that set Xiguard apart</h3>
+  <ol class="diff">
+    <li><span><b>Native to MikroTik.</b> It speaks the RouterOS API directly and absorbs the RouterOS 6 / 7 syntax differences itself — no BGP speaker, route server or extra hardware between detection and enforcement.</span></li>
+    <li><span><b>Learns every IP individually — and refuses to guess.</b> Mandatory warm-up plus two noise floors stop idle and small addresses from being blackholed on meaningless multiples.</span></li>
+    <li><span><b>Verifies its own actions.</b> Every block and release is read back from the router; a failure is surfaced as a critical alert instead of being assumed away.</span></li>
+    <li><span><b>Closes the loop with the upstream.</b> The ISP scrubbing request — normally a manual call — is generated and sent automatically, alongside the internal incident report.</span></li>
+    <li><span><b>Sized for a regional hosting provider.</b> One server, no per-bandwidth licensing, and all traffic data stays inside Netpool's own infrastructure.</span></li>
+  </ol>
+
+  <div class="run-foot"><span>© 2026 Netpool Technologies Private Limited</span><span class="pg">11 / 12</span></div>
+</section>
+
+<!-- ═══════════════════════════ 12. PROPRIETARY ═══════════════════════════ -->
+<section class="page">
+  <div class="run-head"><span><b>Xiguard</b> · Technical overview</span><span>Netpool Technologies Pvt. Ltd. · Proprietary</span></div>
+
+  <div class="sec"><span class="num">10</span><h2>Proprietary technology &amp; authorship</h2></div>
+  <p class="lede">Xiguard was designed and built entirely in-house for Netpool's production network.</p>
+
+  <div class="own">
+    <div class="k">Ownership</div>
+    <p>Xiguard is <strong>proprietary technology of Netpool Technologies Private Limited</strong>. Its architecture, detection model, mitigation workflow, notification workflow, source code and documentation are confidential intellectual property of the company.</p>
+    <p class="fine">No part of the software or of this document may be copied, distributed, reverse-engineered or used to build a competing product without the prior written permission of Netpool Technologies Private Limited.</p>
+  </div>
+
+  <h3 style="margin-top:6mm">Proprietary elements</h3>
+  <div class="caps">
+    <div><b>Per-IP detection model</b><span>EWMA baselining for every address, gated by mandatory warm-up, dual noise floors and a sustained-spike window.</span></div>
+    <div><b>Verified RouterOS mitigation</b><span>Multi-syntax blackhole installation across RouterOS 6 and 7, routing-table read-back and honest rollback.</span></div>
+    <div><b>Dual-audience escalation</b><span>Parallel internal incident report and formal upstream scrubbing request from a single detection.</span></div>
+    <div><b>Non-blocking attack-time pipeline</b><span>Flow collection, atomic per-IP counting and queue isolation that keep detection running while routers and mail servers are struggling.</span></div>
+  </div>
+
+  <h3 style="margin-top:6mm">Created by</h3>
+  <div class="author">
+    <div class="mark">VC</div>
+    <div>
+      <div class="nm">Vansh Chaudhary</div>
+      <div class="rl">Chief Technology Officer, Netpool Technologies Private Limited</div>
+      <div class="ct">Conceived, architected and developed Xiguard — from the NetFlow collector and detection engine to RouterOS mitigation, alerting and the NOC dashboard.</div>
+    </div>
+  </div>
+
+  <div class="grid2" style="margin-top:6mm; align-items:start">
+    <div>
+      <h3 style="margin-top:0">Current scope</h3>
+      <ul class="dash small">
+        <li>Targets volumetric attacks, measured as inbound traffic per IPv4 address.</li>
+        <li>Blocks locally on Netpool's routers; upstream relief comes from the ISP request.</li>
+        <li>Application-layer (L7) attacks are outside its scope.</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="margin-top:0">Roadmap</h3>
+      <ul class="dash small">
+        <li>BGP community-based RTBH to push the drop upstream automatically.</li>
+        <li>IPv6 flow support and packet-rate (PPS) detection.</li>
+        <li>Outbound-abuse detection for compromised customer servers.</li>
+        <li>Chat-ops alerts (Telegram, Slack) and attack analytics.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="run-foot"><span>© 2026 Netpool Technologies Private Limited · Proprietary &amp; confidential</span><span class="pg">12 / 12</span></div>
+</section>
+
+<script>
+  // Cover art: a /24 pool as a 16×16 grid of addresses; one is under attack and blackholed.
+  (function () {
+    const svg = document.getElementById("cover-art");
+    const NS = "http://www.w3.org/2000/svg";
+    const el = (n, a) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); svg.appendChild(e); return e; };
+    const step = 26, off = 25, vr = 9, vc = 8;
+    const vx = off + vc * step, vy = off + vr * step;
+    // flood lines converging on the victim
+    const srcs = [[40,0],[110,0],[180,0],[250,0],[320,0],[400,0],[440,40],[440,120],[440,210],[440,320]];
+    for (const [x, y] of srcs) el("line", { x1: x, y1: y, x2: vx, y2: vy, stroke: "#E5452B", "stroke-width": 1, opacity: .28 });
+    for (let r = 0; r < 16; r++) for (let c = 0; c < 16; c++) {
+      if (r === vr && c === vc) continue;
+      const d = Math.hypot(r - vr, c - vc);
+      el("circle", { cx: off + c * step, cy: off + r * step, r: 4.2, fill: d < 2.3 ? "#3A5274" : "#1E3048" });
+    }
+    for (const [rad, op] of [[34, .18], [22, .35]]) el("circle", { cx: vx, cy: vy, r: rad, fill: "none", stroke: "#E5452B", "stroke-width": 1.2, opacity: op });
+    el("circle", { cx: vx, cy: vy, r: 10, fill: "#000", stroke: "#E5452B", "stroke-width": 2.4 });
+    el("rect", { x: vx + 40, y: vy - 11, width: 110, height: 21, fill: "#0B1622" });
+    const t = el("text", { x: vx + 46, y: vy + 4, fill: "#E5452B", "font-family": "IBM Plex Mono, monospace", "font-size": 11, "font-weight": 600 });
+    t.textContent = "/32 blackholed";
+  })();
+</script>
+</body>
+</html>
