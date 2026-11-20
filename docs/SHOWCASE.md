@@ -38,7 +38,13 @@ Everything stays on the laptop: no traffic or email leaves it.
 | Attack control panel | <http://localhost:8090> | — |
 | NOC mailboxes (Mailpit) | <http://localhost:8025> | — |
 | CHR WebFig (router UI) | <http://localhost:8081> | `xiguard` / `xiguard-demo` |
-| CHR Winbox (optional) | `127.0.0.1:8291` | `xiguard` / `xiguard-demo` |
+| CHR Winbox | Connect To: `127.0.0.1` (port 8291) | `xiguard` / `xiguard-demo` |
+
+The router also has its factory account `admin` with an **empty password**;
+on stage use `xiguard`. Winbox works only on the showcase laptop itself, and the
+router won't appear under *Neighbors* — type `127.0.0.1`. Get Winbox from
+<https://mikrotik.com/download> at home. Router addresses and the rules for
+changing things in Winbox are in [`ADMIN-USER.md`](ADMIN-USER.md).
 
 Simulated prefixes: `203.0.113.0/24` and `198.51.100.0/24` (documentation
 ranges). The named servers you attack on stage live in `203.0.113.0/24`:
@@ -296,7 +302,14 @@ Xiguard couldn't install the route on the router and rolled the IP back to
 
 The login is `admin` / `showcase`. If `.env` was changed after the first start,
 the original password still applies (the admin account is only created on an
-empty database). Reset with `docker compose down -v` and start again.
+empty database). To set a new password — or create the admin if it's missing —
+without losing any data, run this while the showcase is running:
+
+```bash
+docker compose exec postgres psql -U xiguard -d xiguard -c "CREATE EXTENSION IF NOT EXISTS pgcrypto; INSERT INTO users (username, password_hash) VALUES ('admin', crypt('showcase', gen_salt('bf', 12))) ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash, is_active = true, updated_at = NOW();"
+```
+
+Then log in with `admin` / `showcase`. More options are in [`ADMIN-USER.md`](ADMIN-USER.md).
 
 ### The Xiguard panel shows "502 Bad Gateway", doesn't load, or shows a different site
 
@@ -371,6 +384,7 @@ Xiguard        http://localhost:8088     admin / showcase
 Attack panel   http://localhost:8090
 Mailboxes      http://localhost:8025
 Router WebFig  http://localhost:8081     xiguard / xiguard-demo
+Router Winbox  127.0.0.1 (port 8291)     xiguard / xiguard-demo   (factory: admin / empty)
 
 Demo target    game-01  203.0.113.11  → 2.4 Gbps · 60 s
 Timeline       20–30 s to blackhole · 2 min block · 30 s probation · NORMAL
