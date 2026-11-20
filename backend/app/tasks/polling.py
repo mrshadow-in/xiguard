@@ -36,7 +36,7 @@ from app.services.pubsub import CH_STATE, CH_TRAFFIC, get_redis, publish
 from app.tasks._runner import run
 from app.tasks.alert_dispatch import dispatch_ddos_email, dispatch_recovery_email
 from app.tasks.celery_app import celery_app
-from app.tasks.mitigation import push_blackhole_now
+from app.tasks.mitigation import push_blackhole_now, remove_blackhole_now
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,10 @@ async def _cycle() -> dict:
     evaluated = 0
     ips_with_data = 0
     traffic_rows: list[dict] = []
+    # Alert emails read the Alert row, so they may only be queued once this
+    # cycle's transaction has committed — otherwise the worker can run first
+    # and find no alert.
+    ddos_emails: list[dict] = []
 
     async with SessionLocal() as session:
         rows = (
@@ -149,6 +153,15 @@ async def _cycle() -> dict:
                     priority=9,
                 )
 
+            if decision.should_lift_blackhole:
+                # The detector has already moved the IP to RECOVERING, so the
+                # 30 s expiry sweep (which only looks at BLACKHOLED) won't see it.
+                remove_blackhole_now.apply_async(
+                    kwargs={"ip_id": str(ip.id), "chr_id": str(chr_node.id)},
+                    queue="critical",
+                    priority=9,
+                )
+
             if decision.should_emit_alert:
                 alert = Alert(
                     ip_id=ip.id,
@@ -162,10 +175,7 @@ async def _cycle() -> dict:
                 await session.flush()
                 # Email + dedup + WS publish happens in the email-queue
                 # worker so SMTP latency can never block detection.
-                dispatch_ddos_email.apply_async(
-                    kwargs={"alert_id": str(alert.id), "multiplier": float(multiplier)},
-                    queue="email",
-                )
+                ddos_emails.append({"alert_id": str(alert.id), "multiplier": float(multiplier)})
 
             if decision.should_emit_recovery:
                 session.add(
@@ -185,6 +195,9 @@ async def _cycle() -> dict:
             await session.execute(pg_insert(TrafficSample).values(traffic_rows))
 
         await session.commit()
+
+    for kwargs in ddos_emails:
+        dispatch_ddos_email.apply_async(kwargs=kwargs, queue="email")
 
     duration_ms = int((time.perf_counter() - started) * 1000)
     result = {"ips_evaluated": evaluated, "ips_with_data": ips_with_data}
