@@ -1,0 +1,4 @@
+# Containers run these files on Linux; a Windows checkout must not turn them into CRLF.
+*.sh text eol=lf
+showcase/** text eol=lf
+.env text eol=lf

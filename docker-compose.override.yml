@@ -1,0 +1,48 @@
+# ─── Showcase branch only ─────────────────────────────────────────────────────
+# Docker Compose merges this file into docker-compose.yml automatically, so a
+# plain `docker compose up -d --build` starts the whole showcase:
+#   chr            a real MikroTik CHR (under QEMU) + traffic simulator + attack panel
+#   mailpit        a local inbox that catches both NOC alert emails
+#   showcase-init  a one-shot job that connects Xiguard to the CHR
+# See docs/SHOWCASE.md. Never merge this branch into main.
+name: xiguard-showcase
+
+services:
+  caddy:
+    # Port 80 is often already taken on a laptop (IIS, Skype, XAMPP), which
+    # silently shows the wrong site at http://localhost. Use a dedicated port.
+    ports: !override
+      - "127.0.0.1:8088:80"     # Xiguard panel
+
+  chr:
+    build: ./showcase/chr
+    environment:
+      SHOWCASE_PREFIXES: ${SHOWCASE_PREFIXES}
+    ports:
+      - "127.0.0.1:8090:8090"   # attack control panel
+      - "127.0.0.1:8081:80"     # CHR WebFig
+      - "127.0.0.1:8291:8291"   # CHR Winbox
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.33.0
+    ports:
+      - "127.0.0.1:8025:8025"   # NOC mailboxes (web UI)
+    restart: unless-stopped
+
+  showcase-init:
+    extends:
+      file: docker-compose.yml
+      service: api
+    environment:
+      SHOWCASE_PREFIXES: ${SHOWCASE_PREFIXES}
+      SHOWCASE_CHR_PASSWORD: ${SHOWCASE_CHR_PASSWORD}
+    volumes:
+      - ./showcase/provision.py:/app/showcase_provision.py:ro
+    command: python showcase_provision.py
+    depends_on:
+      - api
+      - chr
+      - flow-collector
+      - mailpit
+    restart: "no"
